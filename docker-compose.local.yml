@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  md-editor:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: md-editor-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      # 直接挂载本地文件夹（最简单的方式）
+      - /home/clarance/claude:/app/data
+    environment:
+      - HOST=0.0.0.0
+      - PORT=5173
+      # 配置文件夹路径（容器内路径）
+      - VITE_LOCAL_FOLDERS=/app/data/5ifenxi/output,/app/data/www/output,/app/data/huishu/output
+    restart: unless-stopped

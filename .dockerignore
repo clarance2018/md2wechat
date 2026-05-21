@@ -1,0 +1,13 @@
+node_modules
+dist
+.git
+.github
+.vscode
+.husky
+.spec-workflow
+docker
+*.md
+!README.md
+.env
+.env.local
+.env.*.local
