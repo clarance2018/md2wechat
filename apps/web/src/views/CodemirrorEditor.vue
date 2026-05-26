@@ -86,6 +86,10 @@ function handleUploadImage(file: File, cb?: any, applyUrl?: boolean) {
   editorPanelCompRef.value?.uploadImage(file, cb, applyUrl)
 }
 
+function handleInsertImage(imageUrl: string) {
+  editorPanelCompRef.value?.insertImageMarkdown(imageUrl)
+}
+
 // --- 面板尺寸配置 ---
 const hasSidePanel = computed(() => !isMobile.value && (isOpenRightSlider.value || uiStore.isShowCssEditor))
 
@@ -277,7 +281,7 @@ onUnmounted(() => {
         </ResizablePanelGroup>
       </div>
 
-      <UploadImgDialog @upload-image="handleUploadImage" />
+      <UploadImgDialog @upload-image="handleUploadImage" @insert-image="handleInsertImage" />
 
       <InsertFormDialog />
 

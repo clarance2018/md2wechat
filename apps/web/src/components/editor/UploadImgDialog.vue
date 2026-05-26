@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { toTypedSchema } from '@vee-validate/yup'
-import { UploadCloud } from 'lucide-vue-next'
+import { Copy, Image as ImageIcon, Trash2, UploadCloud } from 'lucide-vue-next'
 import { Field, Form } from 'vee-validate'
 import * as yup from 'yup'
 import { useUIStore } from '@/stores/ui'
 import { checkImage } from '@/utils'
+import { copyPlain } from '@/utils/clipboard'
 import { store } from '@/utils/storage'
+import {
+  addUploadedImageHistoryItem,
+  createUploadedImageHistoryItem,
+  deleteUploadedImageHistoryItem,
+  normalizeUploadedImageHistory,
+  type UploadedImageHistoryItem,
+  UPLOADED_IMAGE_HISTORY_KEY,
+} from '@/utils/uploadImageHistory'
 
-const emit = defineEmits([`uploadImage`])
+const emit = defineEmits([`uploadImage`, `insertImage`])
 
 const uiStore = useUIStore()
 const { enableImageReupload } = storeToRefs(uiStore)
@@ -345,6 +354,71 @@ const options = [
 const imgHost = store.reactive(`imgHost`, `default`)
 const useCompression = store.reactive(`useCompression`, false)
 const activeName = ref(`upload`)
+const uploadedImageHistory = ref<UploadedImageHistoryItem[]>([])
+
+function getHostLabel(value: string) {
+  return options.find(item => item.value === value)?.label || value || `默认`
+}
+
+async function saveUploadedImageHistory(records: UploadedImageHistoryItem[]) {
+  uploadedImageHistory.value = normalizeUploadedImageHistory(records)
+  await store.setJSON(UPLOADED_IMAGE_HISTORY_KEY, uploadedImageHistory.value)
+}
+
+async function loadUploadedImageHistory() {
+  const records = await store.getJSON<UploadedImageHistoryItem[]>(UPLOADED_IMAGE_HISTORY_KEY, [])
+  await saveUploadedImageHistory(records)
+}
+
+async function recordUploadedImage(url: string, file: File) {
+  if (!url) {
+    return
+  }
+
+  const item = createUploadedImageHistoryItem({
+    url,
+    name: file.name || `image`,
+    host: getHostLabel(imgHost.value || `default`),
+  })
+
+  await saveUploadedImageHistory(addUploadedImageHistoryItem(uploadedImageHistory.value, item))
+}
+
+function insertHistoryImage(item: UploadedImageHistoryItem) {
+  emit(`insertImage`, item.url)
+  uiStore.isShowUploadImgDialog = false
+}
+
+async function copyHistoryImageUrl(url: string) {
+  await copyPlain(url)
+  toast.success(`图片链接已复制`)
+}
+
+async function deleteHistoryImage(id: string) {
+  await saveUploadedImageHistory(deleteUploadedImageHistoryItem(uploadedImageHistory.value, id))
+}
+
+function formatUploadedAt(timestamp: number) {
+  return new Date(timestamp).toLocaleString(`zh-CN`, {
+    month: `2-digit`,
+    day: `2-digit`,
+    hour: `2-digit`,
+    minute: `2-digit`,
+  })
+}
+
+watch(
+  () => uiStore.isShowUploadImgDialog,
+  (open) => {
+    if (open) {
+      loadUploadedImageHistory()
+    }
+  },
+)
+
+onMounted(() => {
+  loadUploadedImageHistory()
+})
 
 async function changeImgHost() {
   toast.success(`图床已切换`)
@@ -416,6 +490,7 @@ function emitUploads(file: File) {
   const cleanup = (_url: string, data: string) => {
     clearInterval(intervalId)
     progressValue.value = 100 // 设置完成状态
+    recordUploadedImage(_url, file)
     if (data) {
       imageUrl.value = `data:image/png;base64,${data}`
     }
@@ -528,6 +603,58 @@ function onTabScroll(e: WheelEvent) {
               <img :src="imageUrl" class="max-h-40 object-contain">
             </div>
           </div>
+
+          <section class="mt-5 border rounded-md overflow-hidden">
+            <div class="flex items-center justify-between gap-3 border-b px-3 py-2 bg-muted/30">
+              <div class="flex items-center gap-2 min-w-0">
+                <ImageIcon class="size-4 shrink-0 text-muted-foreground" />
+                <h3 class="text-sm font-medium truncate">
+                  最近 3 天上传
+                </h3>
+              </div>
+              <span class="text-xs text-muted-foreground shrink-0">{{ uploadedImageHistory.length }} 张</span>
+            </div>
+
+            <div v-if="uploadedImageHistory.length === 0" class="px-3 py-6 text-center text-xs text-muted-foreground">
+              暂无本机上传记录
+            </div>
+
+            <div v-else class="max-h-72 overflow-y-auto divide-y">
+              <div
+                v-for="item in uploadedImageHistory"
+                :key="item.id"
+                class="flex items-center gap-3 p-3"
+              >
+                <img
+                  :src="item.url"
+                  :alt="item.name"
+                  class="size-14 rounded border object-cover bg-muted shrink-0"
+                  loading="lazy"
+                >
+
+                <div class="min-w-0 flex-1 space-y-1">
+                  <p class="text-sm font-medium truncate" :title="item.name">
+                    {{ item.name }}
+                  </p>
+                  <p class="text-xs text-muted-foreground truncate">
+                    {{ item.host }} · {{ formatUploadedAt(item.uploadedAt) }}
+                  </p>
+                </div>
+
+                <div class="flex items-center gap-1 shrink-0">
+                  <Button variant="ghost" size="icon" title="插入" aria-label="插入" @click="insertHistoryImage(item)">
+                    <ImageIcon class="size-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" title="复制链接" aria-label="复制链接" @click="copyHistoryImageUrl(item.url)">
+                    <Copy class="size-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" title="删除记录" aria-label="删除记录" @click="deleteHistoryImage(item.id)">
+                    <Trash2 class="size-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </section>
         </TabsContent>
 
         <TabsContent value="github" class="flex-1 flex flex-col overflow-hidden">

@@ -169,6 +169,14 @@ function uploaded(imageUrl: string) {
   toast.success(`图片上传成功`)
 }
 
+function insertImageMarkdown(imageUrl: string) {
+  if (!imageUrl || !codeMirrorView.value) {
+    return
+  }
+
+  codeMirrorView.value.dispatch(codeMirrorView.value.state.replaceSelection(`\n![](${imageUrl})\n`))
+}
+
 async function compressImage(file: File) {
   const options = {
     maxSizeMB: 1,
@@ -561,6 +569,7 @@ onUnmounted(() => {
 defineExpose({
   codeMirrorView,
   editorRefresh,
+  insertImageMarkdown,
   uploadImage,
   progressValue,
 })
