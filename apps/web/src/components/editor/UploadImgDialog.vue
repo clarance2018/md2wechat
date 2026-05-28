@@ -8,8 +8,6 @@ import { checkImage } from '@/utils'
 import { copyPlain } from '@/utils/clipboard'
 import { store } from '@/utils/storage'
 import {
-  addUploadedImageHistoryItem,
-  createUploadedImageHistoryItem,
   deleteUploadedImageHistoryItem,
   normalizeUploadedImageHistory,
   type UploadedImageHistoryItem,
@@ -356,10 +354,6 @@ const useCompression = store.reactive(`useCompression`, false)
 const activeName = ref(`upload`)
 const uploadedImageHistory = ref<UploadedImageHistoryItem[]>([])
 
-function getHostLabel(value: string) {
-  return options.find(item => item.value === value)?.label || value || `默认`
-}
-
 async function saveUploadedImageHistory(records: UploadedImageHistoryItem[]) {
   uploadedImageHistory.value = normalizeUploadedImageHistory(records)
   await store.setJSON(UPLOADED_IMAGE_HISTORY_KEY, uploadedImageHistory.value)
@@ -370,28 +364,20 @@ async function loadUploadedImageHistory() {
   await saveUploadedImageHistory(records)
 }
 
-async function recordUploadedImage(url: string, file: File) {
-  if (!url) {
-    return
-  }
-
-  const item = createUploadedImageHistoryItem({
-    url,
-    name: file.name || `image`,
-    host: getHostLabel(imgHost.value || `default`),
-  })
-
-  await saveUploadedImageHistory(addUploadedImageHistoryItem(uploadedImageHistory.value, item))
-}
-
 function insertHistoryImage(item: UploadedImageHistoryItem) {
   emit(`insertImage`, item.url)
   uiStore.isShowUploadImgDialog = false
 }
 
 async function copyHistoryImageUrl(url: string) {
-  await copyPlain(url)
-  toast.success(`图片链接已复制`)
+  try {
+    await copyPlain(url)
+    toast.success(`图片链接已复制`)
+  }
+  catch (error) {
+    console.error(`复制图片链接失败:`, error)
+    toast.error(`复制失败，请手动复制链接`)
+  }
 }
 
 async function deleteHistoryImage(id: string) {
@@ -490,7 +476,6 @@ function emitUploads(file: File) {
   const cleanup = (_url: string, data: string) => {
     clearInterval(intervalId)
     progressValue.value = 100 // 设置完成状态
-    recordUploadedImage(_url, file)
     if (data) {
       imageUrl.value = `data:image/png;base64,${data}`
     }
@@ -642,13 +627,13 @@ function onTabScroll(e: WheelEvent) {
                 </div>
 
                 <div class="flex items-center gap-1 shrink-0">
-                  <Button variant="ghost" size="icon" title="插入" aria-label="插入" @click="insertHistoryImage(item)">
+                  <Button type="button" variant="ghost" size="icon" title="插入" aria-label="插入" @click.stop.prevent="insertHistoryImage(item)">
                     <ImageIcon class="size-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" title="复制链接" aria-label="复制链接" @click="copyHistoryImageUrl(item.url)">
+                  <Button type="button" variant="ghost" size="icon" title="复制链接" aria-label="复制链接" @click.stop.prevent="copyHistoryImageUrl(item.url)">
                     <Copy class="size-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" title="删除记录" aria-label="删除记录" @click="deleteHistoryImage(item.id)">
+                  <Button type="button" variant="ghost" size="icon" title="删除记录" aria-label="删除记录" @click.stop.prevent="deleteHistoryImage(item.id)">
                     <Trash2 class="size-4" />
                   </Button>
                 </div>

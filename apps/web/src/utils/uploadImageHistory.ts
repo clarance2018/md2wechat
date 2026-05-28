@@ -72,3 +72,27 @@ export function createUploadedImageHistoryItem({
     uploadedAt,
   }
 }
+
+export function createUploadedImageHistoryItemFromUpload({
+  url,
+  fileName,
+  host,
+  uploadedAt = Date.now(),
+}: {
+  url: string
+  fileName?: string
+  host: string
+  uploadedAt?: number
+}): UploadedImageHistoryItem | null {
+  const normalizedUrl = url.trim()
+  if (!normalizedUrl) {
+    return null
+  }
+
+  return createUploadedImageHistoryItem({
+    url: normalizedUrl,
+    name: fileName?.trim() || `image`,
+    host,
+    uploadedAt,
+  })
+}

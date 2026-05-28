@@ -16,6 +16,12 @@ import { useUIStore } from '@/stores/ui'
 import { checkImage, toBase64 } from '@/utils'
 import { fileUpload } from '@/utils/file'
 import { store } from '@/utils/storage'
+import {
+  addUploadedImageHistoryItem,
+  createUploadedImageHistoryItemFromUpload,
+  type UploadedImageHistoryItem,
+  UPLOADED_IMAGE_HISTORY_KEY,
+} from '@/utils/uploadImageHistory'
 
 const props = defineProps<{
   skipCursorDrivenPreviewSync: boolean
@@ -39,6 +45,23 @@ const {
 } = storeToRefs(uiStore)
 
 const { toggleShowUploadImgDialog } = uiStore
+
+const uploadHistoryHostLabels: Record<string, string> = {
+  default: `默认`,
+  aliOSS: `阿里云 OSS`,
+  txCOS: `腾讯云 COS`,
+  qiniu: `七牛云`,
+  minio: `MinIO`,
+  s3: `S3`,
+  gitee: `Gitee`,
+  github: `GitHub`,
+  mp: `公众号图床`,
+  r2: `Cloudflare R2`,
+  upyun: `又拍云`,
+  telegram: `Telegram`,
+  cloudinary: `Cloudinary`,
+  formCustom: `自定义代码`,
+}
 
 const showEditor = computed(() => viewMode.value !== `preview`)
 
@@ -169,6 +192,27 @@ function uploaded(imageUrl: string) {
   toast.success(`图片上传成功`)
 }
 
+async function recordUploadedImageHistory(url: string, file: File) {
+  try {
+    const imgHost = (await store.get(`imgHost`)) || `default`
+    const item = createUploadedImageHistoryItemFromUpload({
+      url,
+      fileName: file.name,
+      host: uploadHistoryHostLabels[imgHost] || imgHost,
+    })
+
+    if (!item) {
+      return
+    }
+
+    const records = await store.getJSON<UploadedImageHistoryItem[]>(UPLOADED_IMAGE_HISTORY_KEY, [])
+    await store.setJSON(UPLOADED_IMAGE_HISTORY_KEY, addUploadedImageHistoryItem(records, item))
+  }
+  catch (error) {
+    console.error(`保存上传图片历史失败:`, error)
+  }
+}
+
 function insertImageMarkdown(imageUrl: string) {
   if (!imageUrl || !codeMirrorView.value) {
     return
@@ -199,6 +243,7 @@ async function uploadImage(
     }
     const base64Content = await toBase64(file)
     const url = await fileUpload(base64Content, file)
+    await recordUploadedImageHistory(url, file)
     if (cb) {
       cb(url, base64Content)
     }

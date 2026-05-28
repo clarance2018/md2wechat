@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import {
   addUploadedImageHistoryItem,
+  createUploadedImageHistoryItemFromUpload,
   deleteUploadedImageHistoryItem,
   normalizeUploadedImageHistory,
   UPLOADED_IMAGE_HISTORY_MAX_ITEMS,
@@ -51,4 +52,29 @@ test('deletes matching record id only', () => {
   ], 'a')
 
   assert.deepEqual(records.map(record => record.id), ['b'])
+})
+
+test('creates a history item for pasted uploads with a displayable url and fallback name', () => {
+  const item = createUploadedImageHistoryItemFromUpload({
+    url: 'https://example.com/pasted.png',
+    fileName: '',
+    host: 'GitHub',
+    uploadedAt: NOW,
+  })
+
+  assert.equal(item.url, 'https://example.com/pasted.png')
+  assert.equal(item.name, 'image')
+  assert.equal(item.host, 'GitHub')
+  assert.equal(item.uploadedAt, NOW)
+})
+
+test('does not create a history item without an uploaded url', () => {
+  const item = createUploadedImageHistoryItemFromUpload({
+    url: '',
+    fileName: 'pasted.png',
+    host: 'GitHub',
+    uploadedAt: NOW,
+  })
+
+  assert.equal(item, null)
 })
