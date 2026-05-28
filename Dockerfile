@@ -7,16 +7,22 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY .npmrc ./
 COPY patches/ ./patches/
+COPY apps/web/package.json ./apps/web/
+COPY packages/core/package.json ./packages/core/
+COPY packages/shared/package.json ./packages/shared/
+COPY packages/config/package.json ./packages/config/
+COPY packages/mcp-server/package.json ./packages/mcp-server/
+COPY packages/md-cli/package.json ./packages/md-cli/
 
 # 安装 pnpm 并安装依赖
 RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
-RUN pnpm install --ignore-workspace
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # 复制源代码
 COPY . .
 
-# 构建应用（跳过类型检查，直接构建）
-RUN cd apps/web && npx cross-env SERVER_ENV=NETLIFY npx vite build
+# 构建正式静态产物
+RUN pnpm --filter @md/web build:h5-netlify:only
 
 # ===== 运行阶段 =====
 FROM nginx:alpine

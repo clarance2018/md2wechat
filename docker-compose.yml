@@ -2,22 +2,8 @@ services:
   md-editor:
     build:
       context: .
-      dockerfile: Dockerfile.dev
-    container_name: md-editor-dev
+      dockerfile: Dockerfile
+    container_name: md-editor
     ports:
-      - "5173:5173"
-    volumes:
-      # 挂载本地文件夹到容器中（用于文件管理功能）
-      # 请根据实际情况修改路径
-      - /home/clarance/claude/5ifenxi/output:/app/data/5ifenxi
-      - /home/clarance/claude/www/output:/app/data/www
-      - /home/clarance/claude/huishu/output:/app/data/huishu
-      # 挂载源代码（可选，用于热重载）
-      - ./apps/web/src:/app/apps/web/src
-      - ./packages:/app/packages
-    environment:
-      - HOST=0.0.0.0
-      - PORT=5173
-      # 配置文件夹路径（容器内路径）
-      - VITE_LOCAL_FOLDERS=/app/data/5ifenxi,/app/data/www,/app/data/huishu
+      - "5173:80"
     restart: unless-stopped
