@@ -5,6 +5,7 @@ import { CheckboxIndicator, CheckboxRoot, Primitive } from 'radix-vue'
 import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { useUIStore } from '@/stores/ui'
+import { isCoseBridgeAvailable, shouldRetryCoseDetection } from '@/utils/coseDetection'
 
 defineOptions({
   inheritAttrs: false,
@@ -136,6 +137,13 @@ async function prePost() {
 // 监听对话框打开，自动加载数据
 watch(dialogVisible, (newVal) => {
   if (newVal) {
+    if (shouldRetryCoseDetection({ dialogOpen: newVal, extensionInstalled: extensionInstalled.value })) {
+      checkExtension({ refreshAccounts: true })
+    }
+    else if (extensionInstalled.value && allAccounts.value.length === 0) {
+      startLoginDetection()
+    }
+
     prePost()
   }
 })
@@ -149,7 +157,7 @@ declare global {
 
 // 获取初始平台列表（不带登录状态，用于立即显示）
 function getInitialPlatforms(): PostAccount[] {
-  if (window.$cose !== undefined && typeof window.$cose.getPlatforms === 'function') {
+  if (isCoseBridgeAvailable(window) && typeof window.$cose.getPlatforms === 'function') {
     return window.$cose.getPlatforms().map((p: any) => ({
       ...p,
       checked: false,
@@ -162,7 +170,7 @@ function getInitialPlatforms(): PostAccount[] {
 
 // 开始登录检测（异步，不阻塞 UI，渐进式更新）
 function startLoginDetection() {
-  if (window.$cose === undefined)
+  if (!isCoseBridgeAvailable(window))
     return
 
   // 立即显示平台列表（带检测中状态）
@@ -280,32 +288,51 @@ function onAvatarError(account: PostAccount, event: Event) {
   img.style.display = 'none'
 }
 
-function checkExtension() {
-  if (window.$cose !== undefined) {
+let checkExtensionTimer: ReturnType<typeof setInterval> | undefined
+
+function checkExtension({ refreshAccounts = false }: { refreshAccounts?: boolean } = {}) {
+  if (isCoseBridgeAvailable(window)) {
     extensionInstalled.value = true
-    getAccounts() // 立即开始登录检测
-    return
+    if (refreshAccounts || allAccounts.value.length === 0) {
+      getAccounts()
+    }
+    return true
   }
 
-  // 如果插件还没加载，5秒内每 500ms 检查一次
+  extensionInstalled.value = false
+
+  if (checkExtensionTimer) {
+    clearInterval(checkExtensionTimer)
+  }
+
   let count = 0
-  const timer = setInterval(async () => {
-    if (window.$cose !== undefined) {
+  checkExtensionTimer = setInterval(async () => {
+    if (isCoseBridgeAvailable(window)) {
       extensionInstalled.value = true
       await getAccounts()
-      clearInterval(timer)
+      clearInterval(checkExtensionTimer)
+      checkExtensionTimer = undefined
       return
     }
 
     count++
-    if (count > 10) {
-      clearInterval(timer)
+    if (count > 20) {
+      clearInterval(checkExtensionTimer)
+      checkExtensionTimer = undefined
     }
   }, 500)
+
+  return false
 }
 
 onBeforeMount(() => {
   checkExtension()
+})
+
+onBeforeUnmount(() => {
+  if (checkExtensionTimer) {
+    clearInterval(checkExtensionTimer)
+  }
 })
 </script>
 
