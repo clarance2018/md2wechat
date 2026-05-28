@@ -34,7 +34,7 @@ import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
 import { usePostStore } from '@/stores/post'
 import { useUIStore } from '@/stores/ui'
-import { copyPlain } from '@/utils/clipboard'
+import { copyPlain, readPlain } from '@/utils/clipboard'
 
 const editorStore = useEditorStore()
 const postStore = usePostStore()
@@ -86,11 +86,11 @@ async function copyToClipboard() {
 // 从剪贴板粘贴
 async function pasteFromClipboard() {
   try {
-    const text = await navigator.clipboard.readText()
+    const text = await readPlain()
     editorStore.replaceSelection(text)
   }
   catch (error) {
-    console.log(`粘贴失败`, error)
+    toast.error((error as Error).message || `粘贴失败`)
   }
 }
 

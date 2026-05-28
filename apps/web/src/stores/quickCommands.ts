@@ -1,4 +1,5 @@
 import { ref, watch } from 'vue'
+import { createId } from '@/utils/id'
 import { store } from '@/utils/storage'
 
 export interface QuickCommandPersisted {
@@ -63,7 +64,7 @@ export const useQuickCommands = defineStore(`quickCommands`, () => {
 
   // ---------- CRUD ----------
   function add(label: string, template: string) {
-    const id = crypto.randomUUID()
+    const id = createId()
     commands.value.push(hydrate({ id, label, template }))
   }
 
