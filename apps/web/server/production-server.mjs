@@ -83,6 +83,23 @@ function safePath(basePath, relativePath) {
   return relative && !relative.startsWith('..') && !path.isAbsolute(relative) ? resolved : null
 }
 
+export function normalizeStaticRequestPath(pathname) {
+  let normalized = pathname
+  if (normalized === '/' || normalized === '/md') {
+    normalized = '/md/'
+  }
+
+  if (normalized.startsWith('/md/')) {
+    normalized = normalized.slice('/md'.length)
+  }
+
+  if (normalized === '/') {
+    return 'index.html'
+  }
+
+  return normalized.replace(/^\/+/, '') || 'index.html'
+}
+
 function loadFolderConfigs() {
   const envValue = process.env.VITE_LOCAL_FOLDERS || ''
   if (!envValue) {
@@ -270,16 +287,7 @@ export async function handleLocalFolderRequest(req, res) {
 
 function serveStatic(req, res) {
   const url = new URL(req.url || '/', `http://${req.headers.host}`)
-  let pathname = decodeURIComponent(url.pathname)
-  if (pathname === '/' || pathname === '/md') {
-    pathname = '/md/'
-  }
-
-  if (pathname.startsWith('/md/')) {
-    pathname = pathname.slice('/md'.length)
-  }
-
-  const requested = pathname === '/' ? '/index.html' : pathname
+  const requested = normalizeStaticRequestPath(decodeURIComponent(url.pathname))
   const target = safePath(distDir, requested)
   const filePath = target && fs.existsSync(target) && fs.statSync(target).isFile()
     ? target
