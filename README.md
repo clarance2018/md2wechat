@@ -14,7 +14,7 @@
 
 ## Docker 运行
 
-默认 `docker-compose.yml` 使用正式版镜像：先构建前端静态资源，再通过 nginx 提供服务。
+默认 `docker-compose.yml` 使用正式版镜像：先构建前端静态资源，再通过 Node 生产服务提供静态页面和服务器端文件管理 API。
 
 ```bash
 docker compose up -d --build
@@ -26,18 +26,21 @@ docker compose up -d --build
 http://localhost:5173/md/
 ```
 
-正式版容器内部监听 `80` 端口，compose 映射到宿主机 `5173` 端口。
-
-如果需要开发模式的服务器端文件管理 API，可改用 `Dockerfile.dev`，并通过 `VITE_LOCAL_FOLDERS` 配置容器内可访问目录：
+正式版容器内部监听 `80` 端口，compose 映射到宿主机 `5173` 端口。`docker-compose.yml` 中通过 `VITE_LOCAL_FOLDERS` 配置容器内可访问目录：
 
 ```yaml
-build:
-  dockerfile: Dockerfile.dev
 environment:
   - VITE_LOCAL_FOLDERS=/app/data/5ifenxi,/app/data/www,/app/data/huishu
 ```
 
-开发模式还需要通过 `volumes` 把宿主机目录挂载到这些容器路径。按你的实际目录修改后重新构建启动即可。
+并通过 `volumes` 把宿主机目录挂载到这些容器路径。按你的实际目录修改后重新构建启动即可。
+
+如果需要 Vite 热重载开发模式，可改用 `Dockerfile.dev`：
+
+```yaml
+build:
+  dockerfile: Dockerfile.dev
+```
 
 ## 本地开发
 

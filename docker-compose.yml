@@ -6,4 +6,11 @@ services:
     container_name: md-editor
     ports:
       - "5173:80"
+    volumes:
+      # 挂载宿主机目录到正式服务容器中，用于服务器端文件管理 API
+      - /home/clarance/claude/5ifenxi/output:/app/data/5ifenxi
+      - /home/clarance/claude/www/output:/app/data/www
+      - /home/clarance/claude/huishu/output:/app/data/huishu
+    environment:
+      - VITE_LOCAL_FOLDERS=/app/data/5ifenxi,/app/data/www,/app/data/huishu
     restart: unless-stopped

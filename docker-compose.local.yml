@@ -6,4 +6,9 @@ services:
     container_name: md-editor
     ports:
       - "5173:80"
+    volumes:
+      # 直接挂载本地文件夹（最简单的方式）
+      - /home/clarance/claude:/app/data
+    environment:
+      - VITE_LOCAL_FOLDERS=/app/data/5ifenxi/output,/app/data/www/output,/app/data/huishu/output
     restart: unless-stopped

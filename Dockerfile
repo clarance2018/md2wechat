@@ -25,16 +25,18 @@ COPY . .
 RUN pnpm --filter @md/web build:h5-netlify:only
 
 # ===== 运行阶段 =====
-FROM nginx:alpine
+FROM node:22-alpine
 
-# 复制构建产物到 nginx
-COPY --from=builder /app/apps/web/dist /usr/share/nginx/html
-
-# 复制自定义 nginx 配置
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app/apps/web
+ENV HOST=0.0.0.0
+ENV PORT=80
+COPY --from=builder /app/node_modules /app/node_modules
+COPY --from=builder /app/apps/web/node_modules /app/apps/web/node_modules
+COPY --from=builder /app/apps/web/dist /app/apps/web/dist
+COPY apps/web/server ./server
 
 # 暴露端口
 EXPOSE 80
 
-# 启动 nginx
-CMD ["nginx", "-g", "daemon off;"]
+# 启动正式服务
+CMD ["node", "server/production-server.mjs"]
