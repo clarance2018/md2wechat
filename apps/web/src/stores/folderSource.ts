@@ -1,3 +1,5 @@
+import { getBrowserLocalFolderAccessState } from '@/utils/localFolderAccess'
+
 /**
  * 文件系统节点接口
  */
@@ -73,16 +75,15 @@ export const useFolderSourceStore = defineStore(`folderSource`, () => {
   const savedFolders = ref<any[]>([])
 
   // 检查浏览器是否支持 File System Access API
-  const isFileSystemAPISupported = computed(() => {
-    return typeof window !== `undefined` && `showDirectoryPicker` in window
-  })
+  const fileSystemAccessState = computed(() => getBrowserLocalFolderAccessState())
+  const isFileSystemAPISupported = computed(() => fileSystemAccessState.value.isSupported)
 
   /**
    * 选择并打开本地文件夹
    */
   async function selectFolder() {
     if (!isFileSystemAPISupported.value) {
-      toast.error(`您的浏览器不支持 File System Access API`)
+      toast.error(fileSystemAccessState.value.message)
       return
     }
 
@@ -349,6 +350,7 @@ export const useFolderSourceStore = defineStore(`folderSource`, () => {
     loadError,
 
     // Computed
+    fileSystemAccessState,
     isFileSystemAPISupported,
 
     // Actions

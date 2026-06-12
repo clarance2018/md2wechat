@@ -58,6 +58,7 @@ const {
   selectedFilePath: localSelectedFilePath,
   isLoading: localIsLoading,
   loadError: localLoadError,
+  fileSystemAccessState,
   isFileSystemAPISupported,
 } = storeToRefs(folderSourceStore)
 
@@ -409,10 +410,10 @@ async function handleSaveFile() {
         >
           <FolderClosed class="h-12 w-12 mb-2 opacity-50" />
           <p class="text-sm">
-            您的浏览器不支持本地文件夹访问
+            {{ fileSystemAccessState.message }}
           </p>
           <p class="text-xs mt-1">
-            请使用 Chrome、Edge 或 Opera 浏览器
+            {{ fileSystemAccessState.hint }}
           </p>
         </div>
 
