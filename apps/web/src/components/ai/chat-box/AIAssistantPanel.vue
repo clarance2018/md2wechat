@@ -13,7 +13,8 @@ import {
   Send,
   Settings,
   Trash2,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
+import { v4 as uuidv4 } from 'uuid'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -32,14 +33,16 @@ import { Textarea } from '@/components/ui/textarea'
 import { buildAIHeaders, resolveEndpointUrl, useAIFetch } from '@/composables/useAIFetch'
 import useAIConfigStore from '@/stores/aiConfig'
 import { useEditorStore } from '@/stores/editor'
-import { useQuickCommands } from '@/stores/quickCommands'
+import { useQuickCommandsStore } from '@/stores/quickCommands'
 import { useUIStore } from '@/stores/ui'
 import { copyPlain } from '@/utils/clipboard'
-import { createId } from '@/utils/id'
 import { store } from '@/utils/storage'
 
 const props = defineProps<{ open: boolean }>()
+
 const emit = defineEmits([`update:open`])
+
+const FEEDBACK_INDICATOR_TIMEOUT_MS = 1500
 
 const editorStore = useEditorStore()
 const { editor } = storeToRefs(editorStore)
@@ -82,21 +85,10 @@ const messages = ref<ChatMessage[]>([])
 const AIConfigStore = useAIConfigStore()
 const { apiKey, endpoint, model, temperature, maxToken, type } = storeToRefs(AIConfigStore)
 
-const quickCmdStore = useQuickCommands()
+const quickCmdStore = useQuickCommandsStore()
 
 function getSelectedText(): string {
-  try {
-    const cm: any = editor.value
-    if (!cm)
-      return ``
-    if (typeof cm.getSelection === `function`)
-      return cm.getSelection() || ``
-    return ``
-  }
-  catch (e) {
-    console.warn(`获取选中文本失败`, e)
-    return ``
-  }
+  return editorStore.getSelection()
 }
 
 function applyQuickCommand(cmd: QuickCommandRuntime) {
@@ -115,23 +107,17 @@ function applyQuickCommand(cmd: QuickCommandRuntime) {
 }
 
 onMounted(async () => {
-  const savedList = await store.get(conversationListKey)
-  if (savedList) {
-    conversationList.value = JSON.parse(savedList)
-  }
+  conversationList.value = await store.getJSON(conversationListKey, [])
 
-  const saved = await store.get(memoryKey)
-  messages.value = saved
-    ? JSON.parse(saved).map((msg: ChatMessage) => ({
-        ...msg,
-        id: msg.id || createId(),
-      }))
+  const saved = await store.getJSON<ChatMessage[]>(memoryKey, [])
+  messages.value = saved.length > 0
+    ? saved.map((msg: ChatMessage) => ({ ...msg, id: msg.id || uuidv4() }))
     : getDefaultMessages()
   await scrollToBottom(true)
 })
 
 function getDefaultMessages(): ChatMessage[] {
-  return [{ role: `assistant`, content: `你好，我是 AI 助手，有什么可以帮你的？`, id: createId() }]
+  return [{ role: `assistant`, content: `你好，我是 AI 助手，有什么可以帮你的？`, id: uuidv4() }]
 }
 
 function generateConversationTitle(): string {
@@ -152,7 +138,7 @@ async function autoSaveCurrentConversation() {
     return
 
   if (!currentConversationId.value) {
-    currentConversationId.value = createId()
+    currentConversationId.value = uuidv4()
 
     const conversation = {
       id: currentConversationId.value,
@@ -190,7 +176,7 @@ async function loadConversation(id: string) {
   if (saved.length > 0) {
     messages.value = saved.map(msg => ({
       ...msg,
-      id: msg.id || createId(),
+      id: msg.id || uuidv4(),
     }))
     currentConversationId.value = id
     await store.setJSON(memoryKey, messages.value)
@@ -263,13 +249,13 @@ function handleKeydown(e: KeyboardEvent) {
 async function copyToClipboard(text: string, index: number) {
   copyPlain(text)
   copiedIndex.value = index
-  setTimeout(() => (copiedIndex.value = null), 1500)
+  setTimeout(() => (copiedIndex.value = null), FEEDBACK_INDICATOR_TIMEOUT_MS)
 }
 
 function insertToDocument(text: string, index: number) {
   editorStore.insertAtCursor(text)
   insertedIndex.value = index
-  setTimeout(() => (insertedIndex.value = null), 1500)
+  setTimeout(() => (insertedIndex.value = null), FEEDBACK_INDICATOR_TIMEOUT_MS)
   toast.success(`已插入文档`)
 }
 

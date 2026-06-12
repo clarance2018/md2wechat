@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Bot, Image as ImageIcon, Settings2, Wand2 } from 'lucide-vue-next'
+import { Bot, Image as ImageIcon, Settings2, Wand2 } from '@lucide/vue'
 import { useEditorStore } from '@/stores/editor'
 import { useUIStore } from '@/stores/ui'
 import AIAssistantPanel from './chat-box/AIAssistantPanel.vue'
@@ -10,6 +10,7 @@ defineProps<{
   isMobile: boolean
   showEditor: boolean
 }>()
+const SELECTION_HINT_TIMEOUT_MS = 3000
 
 const uiStore = useUIStore()
 const { aiDialogVisible, aiImageDialogVisible } = storeToRefs(uiStore)
@@ -29,7 +30,6 @@ const toolBoxVisible = ref(false)
 // 是否显示选中文本提示动画
 const showSelectionHint = ref(false)
 let selectionHintTimer: NodeJS.Timeout | null = null
-let selectionCheckInterval: NodeJS.Timeout | null = null
 let lastSelectedText = ``
 
 // 检查选中文本的函数
@@ -74,7 +74,7 @@ function checkSelectionAndUpdateHint() {
       // 3秒后自动隐藏提示
       selectionHintTimer = setTimeout(() => {
         showSelectionHint.value = false
-      }, 3000)
+      }, SELECTION_HINT_TIMEOUT_MS)
     }
     else {
       showSelectionHint.value = false
@@ -125,10 +125,11 @@ function openAIToolBox() {
 
 // 监听编辑区点击，自动收起工具栏
 onMounted(() => {
-  // 启动定时检查选中文本
-  selectionCheckInterval = setInterval(() => {
+  // 使用 selectionchange 事件替代轮询，检测选中文本变化
+  const handleSelectionChange = () => {
     checkSelectionAndUpdateHint()
-  }, 300) // 每300ms检查一次
+  }
+  document.addEventListener(`selectionchange`, handleSelectionChange)
 
   const handleInteraction = (e: Event) => {
     // 只有在展开状态才需要处理
@@ -174,17 +175,12 @@ onMounted(() => {
   onUnmounted(() => {
     document.removeEventListener(`click`, handleInteraction, true)
     document.removeEventListener(`touchstart`, handleInteraction, true)
+    document.removeEventListener(`selectionchange`, handleSelectionChange)
 
     // 清理定时器
     if (selectionHintTimer) {
       clearTimeout(selectionHintTimer)
       selectionHintTimer = null
-    }
-
-    // 清理轮询
-    if (selectionCheckInterval) {
-      clearInterval(selectionCheckInterval)
-      selectionCheckInterval = null
     }
   })
 })
@@ -192,9 +188,11 @@ onMounted(() => {
 
 <template>
   <!-- 编辑区内侧AI工具栏 -->
+  <!-- @mousedown.prevent 防止点击工具栏时编辑器失去焦点，从而保持选区高亮 -->
   <div
     v-if="(!isMobile || (isMobile && showEditor))"
     class="editor-ai-toolbar absolute top-1/2 -translate-y-1/2 right-0 z-30 transition-all duration-300 ease-out"
+    @mousedown.prevent
   >
     <!-- 默认状态：贴边栏 -->
     <div

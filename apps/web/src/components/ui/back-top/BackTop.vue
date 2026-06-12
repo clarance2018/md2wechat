@@ -1,6 +1,6 @@
 <script setup lang="ts">
+import { ArrowUpFromLine } from '@lucide/vue'
 import { throttle } from 'es-toolkit'
-import { ArrowUpFromLine } from 'lucide-vue-next'
 
 type Target = HTMLElement | Window | null
 
@@ -33,6 +33,10 @@ const throttledScroll = throttle((el: Target) => {
   }
 }, 200, { edges: [`leading`, `trailing`] })
 
+function handleScroll() {
+  throttledScroll(target.value)
+}
+
 onMounted(() => {
   if (props.target) {
     target.value = document.getElementById(props.target)
@@ -41,15 +45,11 @@ onMounted(() => {
     target.value = window
   }
 
-  target.value!.addEventListener(`scroll`, () => {
-    throttledScroll(target.value)
-  })
+  target.value?.addEventListener(`scroll`, handleScroll)
 })
 
 onUnmounted(() => {
-  target.value!.removeEventListener(`scroll`, () => {
-    throttledScroll(target.value)
-  })
+  target.value?.removeEventListener(`scroll`, handleScroll)
 })
 </script>
 

@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { Contact, Image, Table } from 'lucide-vue-next'
+import { Blocks, Image, Table } from '@lucide/vue'
+import { useEditorStore } from '@/stores/editor'
 import { useUIStore } from '@/stores/ui'
+import { normalizeFormulaInput } from '@/utils/formula'
 
 const props = withDefaults(defineProps<{
   asSub?: boolean
@@ -10,8 +12,17 @@ const props = withDefaults(defineProps<{
 
 const { asSub } = toRefs(props)
 const uiStore = useUIStore()
+const editorStore = useEditorStore()
 
-const { toggleShowInsertFormDialog, toggleShowUploadImgDialog, toggleShowInsertMpCardDialog } = uiStore
+const { toggleShowInsertFormDialog, toggleShowUploadImgDialog, toggleShowComponentDialog } = uiStore
+
+function openFormulaEditor() {
+  const selection = normalizeFormulaInput(editorStore.getSelection())
+  uiStore.openFormulaEditor({
+    value: selection.latex,
+    displayMode: selection.displayMode,
+  })
+}
 </script>
 
 <template>
@@ -23,15 +34,19 @@ const { toggleShowInsertFormDialog, toggleShowUploadImgDialog, toggleShowInsertM
     <MenubarSubContent class="w-52">
       <MenubarItem @click="toggleShowUploadImgDialog()">
         <Image class="mr-2 h-4 w-4" />
-        插入图片
+        图片
+      </MenubarItem>
+      <MenubarItem @click="openFormulaEditor()">
+        <span class="mr-2 inline-flex h-4 w-4 items-center justify-center text-xs font-semibold">ƒ</span>
+        公式
       </MenubarItem>
       <MenubarItem @click="toggleShowInsertFormDialog()">
         <Table class="mr-2 h-4 w-4" />
-        插入表格
+        表格
       </MenubarItem>
-      <MenubarItem @click="toggleShowInsertMpCardDialog()">
-        <Contact class="mr-2 h-4 w-4" />
-        公众号名片
+      <MenubarItem @click="toggleShowComponentDialog()">
+        <Blocks class="mr-2 h-4 w-4" />
+        组件
       </MenubarItem>
     </MenubarSubContent>
   </MenubarSub>
@@ -44,15 +59,19 @@ const { toggleShowInsertFormDialog, toggleShowUploadImgDialog, toggleShowInsertM
     <MenubarContent class="w-52" align="start">
       <MenubarItem @click="toggleShowUploadImgDialog()">
         <Image class="mr-2 h-4 w-4" />
-        插入图片
+        图片
+      </MenubarItem>
+      <MenubarItem @click="openFormulaEditor()">
+        <span class="mr-2 inline-flex h-4 w-4 items-center justify-center text-xs font-semibold">ƒ</span>
+        公式
       </MenubarItem>
       <MenubarItem @click="toggleShowInsertFormDialog()">
         <Table class="mr-2 h-4 w-4" />
-        插入表格
+        表格
       </MenubarItem>
-      <MenubarItem @click="toggleShowInsertMpCardDialog()">
-        <Contact class="mr-2 h-4 w-4" />
-        公众号名片
+      <MenubarItem @click="toggleShowComponentDialog()">
+        <Blocks class="mr-2 h-4 w-4" />
+        组件
       </MenubarItem>
     </MenubarContent>
   </MenubarMenu>

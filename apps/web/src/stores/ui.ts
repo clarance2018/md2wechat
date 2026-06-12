@@ -52,20 +52,12 @@ export const useUIStore = defineStore(`ui`, () => {
     previewDevice.value = previewDevice.value === `desktop` ? `mobile` : `desktop`
   }
 
-  // 是否固定显示浮动目录
-  const isPinFloatingToc = store.reactive(addPrefix(`isPinFloatingToc`), false)
-  const togglePinFloatingToc = useToggle(isPinFloatingToc)
-
-  // 是否显示浮动目录
-  const isShowFloatingToc = store.reactive(addPrefix(`isShowFloatingToc`), true)
-  const toggleShowFloatingToc = useToggle(isShowFloatingToc)
-
   // 是否启用图片转存（默认关闭）
   const enableImageReupload = store.reactive(addPrefix(`enableImageReupload`), false)
   const toggleImageReupload = useToggle(enableImageReupload)
 
   // 是否开启同步滚动（编辑器与预览区联动）
-  const enableScrollSync = store.reactive(addPrefix(`enableScrollSync`), false)
+  const enableScrollSync = store.reactive(addPrefix(`enableScrollSync`), true)
   const toggleScrollSync = useToggle(enableScrollSync)
 
   // ==================== 对话框状态 ====================
@@ -77,13 +69,33 @@ export const useUIStore = defineStore(`ui`, () => {
   const isShowInsertFormDialog = ref(false)
   const toggleShowInsertFormDialog = useToggle(isShowInsertFormDialog)
 
-  // 是否展示插入公众号名片对话框
-  const isShowInsertMpCardDialog = ref(false)
-  const toggleShowInsertMpCardDialog = useToggle(isShowInsertMpCardDialog)
-
   // 是否展示上传图片对话框
   const isShowUploadImgDialog = ref(false)
   const toggleShowUploadImgDialog = useToggle(isShowUploadImgDialog)
+
+  // 是否展示公式编辑对话框
+  const isShowFormulaEditorDialog = ref(false)
+  const formulaEditorValue = ref(``)
+  const formulaEditorDisplayMode = ref(true)
+  const formulaEditorSourceRaw = ref<string | null>(null)
+
+  function openFormulaEditor(options: {
+    value?: string
+    displayMode?: boolean
+    sourceRaw?: string | null
+  } = {}) {
+    formulaEditorValue.value = options.value ?? ``
+    formulaEditorDisplayMode.value = options.displayMode ?? true
+    formulaEditorSourceRaw.value = options.sourceRaw ?? null
+    isShowFormulaEditorDialog.value = true
+  }
+
+  function closeFormulaEditor() {
+    isShowFormulaEditorDialog.value = false
+    formulaEditorValue.value = ``
+    formulaEditorDisplayMode.value = true
+    formulaEditorSourceRaw.value = null
+  }
 
   // 是否展示导入 Markdown 对话框
   const isShowImportMdDialog = ref(false)
@@ -91,12 +103,42 @@ export const useUIStore = defineStore(`ui`, () => {
   /** 通过 URL 参数 open 打开时传入的待导入链接，对话框打开后会据此自动执行导入 */
   const importMdOpenUrl = ref<string | null>(null)
 
+  // 是否展示本地图片上传对话框
+  const isShowLocalImageUpload = ref(false)
+  const toggleShowLocalImageUpload = useToggle(isShowLocalImageUpload)
+  /** 待处理的本地图片上传数据 */
+  const localImageUploadData = ref<{
+    markdownContent: string
+    detectedPaths: string[]
+    processed?: boolean
+    skipUpload?: boolean
+    successCount?: number
+    failCount?: number
+  } | null>(null)
+
   // 是否展示模板管理对话框
   const isShowTemplateDialog = ref(false)
   const toggleShowTemplateDialog = useToggle(isShowTemplateDialog)
 
-  // 是否打开重置样式确认对话框
-  const isOpenConfirmDialog = ref(false)
+  // 是否展示组件对话框
+  const isShowComponentDialog = ref(false)
+  const toggleShowComponentDialog = useToggle(isShowComponentDialog)
+
+  // 是否展示云同步对话框
+  const isShowSyncDialog = ref(false)
+  const toggleShowSyncDialog = useToggle(isShowSyncDialog)
+
+  // 是否展示账户对话框
+  const isShowAccountDialog = ref(false)
+  const toggleShowAccountDialog = useToggle(isShowAccountDialog)
+
+  // 组件对话框 — 打开时预展开的组件名（如 'MpProfile'）
+  const componentDialogTarget = ref<string | null>(null)
+
+  function openComponentDialogWithTarget(target: string) {
+    componentDialogTarget.value = target
+    isShowComponentDialog.value = true
+  }
 
   // AI 对话框
   const aiDialogVisible = ref(false)
@@ -161,8 +203,6 @@ export const useUIStore = defineStore(`ui`, () => {
     isMobile,
     viewMode,
     previewDevice,
-    isPinFloatingToc,
-    isShowFloatingToc,
     isOpenFolderPanel,
     enableImageReupload,
     enableScrollSync,
@@ -172,16 +212,30 @@ export const useUIStore = defineStore(`ui`, () => {
     toggleShowCssEditor,
     isShowInsertFormDialog,
     toggleShowInsertFormDialog,
-    isShowInsertMpCardDialog,
-    toggleShowInsertMpCardDialog,
     isShowUploadImgDialog,
     toggleShowUploadImgDialog,
+    isShowFormulaEditorDialog,
+    formulaEditorValue,
+    formulaEditorDisplayMode,
+    formulaEditorSourceRaw,
+    openFormulaEditor,
+    closeFormulaEditor,
     isShowImportMdDialog,
     toggleShowImportMdDialog,
     importMdOpenUrl,
+    isShowLocalImageUpload,
+    toggleShowLocalImageUpload,
+    localImageUploadData,
     isShowTemplateDialog,
     toggleShowTemplateDialog,
-    isOpenConfirmDialog,
+    isShowComponentDialog,
+    toggleShowComponentDialog,
+    isShowSyncDialog,
+    toggleShowSyncDialog,
+    isShowAccountDialog,
+    toggleShowAccountDialog,
+    componentDialogTarget,
+    openComponentDialogWithTarget,
     aiDialogVisible,
     toggleAIDialog,
     aiImageDialogVisible,
@@ -196,8 +250,6 @@ export const useUIStore = defineStore(`ui`, () => {
     toggleDark,
     toggleEditOnLeft,
     toggleAIToolbox,
-    togglePinFloatingToc,
-    toggleShowFloatingToc,
     toggleImageReupload,
     toggleScrollSync,
     setViewMode,

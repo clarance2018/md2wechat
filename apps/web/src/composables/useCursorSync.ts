@@ -1,15 +1,15 @@
 import type { MaybeRefOrGetter } from 'vue'
 import { EditorView } from '@codemirror/view'
+import { useUIStore } from '@/stores/ui'
 
+/**
+ * 点击预览区元素时，定位回编辑器对应位置。
+ */
 export function useCursorSync(
   codeMirrorViewRef: MaybeRefOrGetter<EditorView | null>,
-  previewContainerRef: MaybeRefOrGetter<HTMLElement | null>,
 ) {
-  const cursorSyncTimer = ref<ReturnType<typeof setTimeout>>()
-  const skipCursorDrivenPreviewSync = ref(false)
-
   const getEditorView = () => toValue(codeMirrorViewRef)
-  const getPreviewContainer = () => toValue(previewContainerRef)
+  const uiStore = useUIStore()
 
   function normalizeText(text: string) {
     return text
@@ -18,60 +18,21 @@ export function useCursorSync(
   }
 
   function parseMarkdownHeadingLine(line: string): { level: number, title: string } | null {
-    if (!line.startsWith(`#`)) {
+    if (!line.startsWith(`#`))
       return null
-    }
 
     let level = 0
-    while (level < line.length && line[level] === `#` && level < 6) {
+    while (level < line.length && line[level] === `#` && level < 6)
       level++
-    }
 
-    if (level === 0 || line[level] !== ` `) {
+    if (level === 0 || line[level] !== ` `)
       return null
-    }
 
     const title = normalizeText(line.slice(level + 1).replace(/#+\s*$/, ``))
-    if (!title) {
+    if (!title)
       return null
-    }
 
     return { level, title }
-  }
-
-  function scrollPreviewToElement(el: HTMLElement, behavior: ScrollBehavior = `auto`) {
-    const container = getPreviewContainer()
-    if (!container)
-      return
-
-    const cRect = container.getBoundingClientRect()
-    const eRect = el.getBoundingClientRect()
-    const inView = eRect.top >= cRect.top + 32 && eRect.bottom <= cRect.bottom - 32
-
-    if (!inView) {
-      el.scrollIntoView({ behavior, block: `center` })
-    }
-  }
-
-  function findHeadingElementInPreview(title: string, level?: number) {
-    const headings = document.querySelectorAll<HTMLElement>(`#output [data-heading]`)
-    const normalizedTitle = normalizeText(title)
-
-    for (const heading of headings) {
-      if (level && Number(heading.tagName.slice(1)) !== level)
-        continue
-      if (normalizeText(heading.textContent || ``) === normalizedTitle) {
-        return heading
-      }
-    }
-
-    for (const heading of headings) {
-      if (level && Number(heading.tagName.slice(1)) !== level)
-        continue
-      if (normalizeText(heading.textContent || ``).includes(normalizedTitle)) {
-        return heading
-      }
-    }
   }
 
   function findHeadingPosInEditor(title: string, level?: number) {
@@ -119,71 +80,11 @@ export function useCursorSync(
 
     for (const candidate of candidates) {
       const pos = docText.indexOf(candidate)
-      if (pos !== -1) {
+      if (pos !== -1)
         return pos
-      }
     }
 
     return null
-  }
-
-  function focusEditorAtPos(pos: number) {
-    const view = getEditorView()
-    if (!view)
-      return
-
-    skipCursorDrivenPreviewSync.value = true
-    view.dispatch({
-      selection: { anchor: pos },
-      effects: EditorView.scrollIntoView(pos, { y: `center` }),
-    })
-    view.focus()
-
-    setTimeout(() => {
-      skipCursorDrivenPreviewSync.value = false
-    }, 180)
-  }
-
-  function syncPreviewToEditorCursor() {
-    if (skipCursorDrivenPreviewSync.value)
-      return
-
-    const view = getEditorView()
-    if (!view)
-      return
-
-    const cursorPos = view.state.selection.main.head
-    const doc = view.state.doc
-    const cursorLineNo = doc.lineAt(cursorPos).number
-
-    // 优先按"最近标题"进行语义定位，避免图片/代码块造成的高度失真。
-    for (let lineNo = cursorLineNo; lineNo >= 1; lineNo--) {
-      const text = doc.line(lineNo).text
-      const parsed = parseMarkdownHeadingLine(text)
-      if (!parsed)
-        continue
-
-      const headingEl = findHeadingElementInPreview(parsed.title, parsed.level)
-      if (headingEl) {
-        scrollPreviewToElement(headingEl)
-        return
-      }
-    }
-
-    // 无可用语义锚点时，退化为轻量比例定位。
-    const container = getPreviewContainer()
-    if (!container)
-      return
-    const maxScrollTop = container.scrollHeight - container.offsetHeight
-    const ratio = doc.length > 0 ? cursorPos / doc.length : 0
-    container.scrollTo({ top: Math.max(0, maxScrollTop * ratio), behavior: `auto` })
-  }
-
-  function scheduleSyncPreviewToEditorCursor() {
-    clearTimeout(cursorSyncTimer.value)
-    cursorSyncTimer.value = setTimeout(() => {
-      syncPreviewToEditorCursor()
-    }, 100)
   }
 
   function syncEditorToPreviewElement(el: HTMLElement) {
@@ -209,7 +110,15 @@ export function useCursorSync(
     }
 
     if (pos != null) {
-      focusEditorAtPos(pos)
+      const view = getEditorView()
+      if (!view)
+        return
+
+      view.dispatch({
+        selection: { anchor: pos },
+        effects: EditorView.scrollIntoView(pos, { y: `center` }),
+      })
+      view.focus()
     }
   }
 
@@ -218,6 +127,45 @@ export function useCursorSync(
     if (!target)
       return
 
+    // 拦截预览区角标 a 标签（以及其他内部锚点链接，如脚注），手动平滑滚动
+    const linkEl = target.closest(`a`) as HTMLAnchorElement | null
+    if (linkEl) {
+      const href = linkEl.getAttribute(`href`)
+      if (href && href.startsWith(`#`)) {
+        let targetId = ``
+        try {
+          targetId = decodeURIComponent(href.slice(1))
+        }
+        catch {}
+        if (targetId) {
+          const targetEl = document.getElementById(targetId)
+          if (targetEl) {
+            const container = target.closest(`.preview-wrapper`) || document.getElementById(`preview`)
+            if (container && container.contains(targetEl)) {
+              event.preventDefault()
+              event.stopPropagation()
+              const containerRect = container.getBoundingClientRect()
+              const elementRect = targetEl.getBoundingClientRect()
+              const targetScrollTop = elementRect.top - containerRect.top + container.scrollTop
+              container.scrollTo({
+                top: targetScrollTop,
+                behavior: `smooth`,
+              })
+              return
+            }
+          }
+        }
+      }
+    }
+
+    const formulaEl = target.closest(`[data-math-raw]`) as HTMLElement | null
+    if (formulaEl) {
+      const raw = formulaEl.getAttribute(`data-math-raw`) ?? ``
+      const display = formulaEl.getAttribute(`data-math-display`) === `true`
+      uiStore.openFormulaEditor({ value: raw, displayMode: display, sourceRaw: raw })
+      return
+    }
+
     const block = target.closest(`h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,td,th,img`) as HTMLElement | null
     if (!block)
       return
@@ -225,14 +173,7 @@ export function useCursorSync(
     syncEditorToPreviewElement(block)
   }
 
-  function cleanup() {
-    clearTimeout(cursorSyncTimer.value)
-  }
-
   return {
-    skipCursorDrivenPreviewSync,
-    scheduleSyncPreviewToEditorCursor,
     handlePreviewContentClick,
-    cleanup,
   }
 }

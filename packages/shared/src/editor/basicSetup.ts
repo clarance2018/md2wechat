@@ -47,7 +47,6 @@ import { indentationMarkers } from '@replit/codemirror-indentation-markers'
 /// and an array literal), copy it into your own code, and adjust it
 /// as desired.
 export const basicSetup: Extension = (() => [
-  // lineNumbers(), // 移除行号显示
   highlightActiveLineGutter(),
   highlightSpecialChars(),
   history(),
@@ -75,23 +74,6 @@ export const basicSetup: Extension = (() => [
     ...lintKeymap,
     { key: `Tab`, run: acceptCompletion }, // use tab to completion
     indentWithTab,
-  ]),
-])()
-
-/// A minimal set of extensions to create a functional editor. Only
-/// includes [the default keymap](#commands.defaultKeymap), [undo
-/// history](#commands.history), [special character
-/// highlighting](#view.highlightSpecialChars), [custom selection
-/// drawing](#view.drawSelection), and [default highlight
-/// style](#language.defaultHighlightStyle).
-export const minimalSetup: Extension = (() => [
-  highlightSpecialChars(),
-  history(),
-  drawSelection(),
-  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-  keymap.of([
-    ...defaultKeymap,
-    ...historyKeymap,
   ]),
 ])()
 

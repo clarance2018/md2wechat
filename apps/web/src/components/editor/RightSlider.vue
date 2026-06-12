@@ -5,6 +5,7 @@ import type {
   themeMap,
 } from '@md/shared/configs'
 import type { Format } from 'vue-pick-colors'
+import { X } from '@lucide/vue'
 import {
   codeBlockThemeOptions,
   colorOptions,
@@ -15,14 +16,15 @@ import {
   legendOptions,
   themeOptions,
 } from '@md/shared/configs'
-import { X } from 'lucide-vue-next'
 import PickColors from 'vue-pick-colors'
+import { useConfirmStore } from '@/stores/confirm'
 import { useCssEditorStore } from '@/stores/cssEditor'
 import { useEditorStore } from '@/stores/editor'
 import { useRenderStore } from '@/stores/render'
 import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 
+const confirmStore = useConfirmStore()
 const cssEditorStore = useCssEditorStore()
 const uiStore = useUIStore()
 const themeStore = useThemeStore()
@@ -104,7 +106,9 @@ function colorChanged(newColor: string) {
   editorRefresh()
 }
 
-function codeBlockThemeChanged(newTheme: string) {
+function codeBlockThemeChanged(newTheme: unknown) {
+  if (typeof newTheme !== 'string')
+    return
   themeStore.codeBlockTheme = newTheme
   editorRefresh()
 }
@@ -144,7 +148,19 @@ function useJustifyChanged() {
 }
 
 function resetStyleConfirm() {
-  uiStore.isOpenConfirmDialog = true
+  confirmStore.confirm({
+    title: '提示',
+    description: '此操作将丢失本地自定义样式，是否继续？',
+    onConfirm: () => {
+      themeStore.resetStyle()
+      cssEditorStore.resetCssConfig()
+      themeStore.applyCurrentTheme()
+      themeStore.updateCodeTheme()
+      const raw = editorStore.getContent()
+      renderStore.render(raw)
+      toast.success(`样式已重置`)
+    },
+  })
 }
 
 // 控制是否启用动画

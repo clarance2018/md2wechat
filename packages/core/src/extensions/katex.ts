@@ -1,4 +1,8 @@
+/// <reference path="../mathjax.d.ts" />
 import type { MarkedExtension } from 'marked'
+import type { KatexRenderFn, KatexToken } from '../types/marked-tokens'
+import { asKatexRenderer } from '../types/marked-tokens'
+import { escapeHtml } from '../utils/basicHelpers'
 
 export interface MarkedKatexOptions {
   nonStandard?: boolean
@@ -13,44 +17,41 @@ const blockRule = /^\s{0,3}(\${1,2})[ \t]*\n([\s\S]+?)\n\s{0,3}\1[ \t]*(?:\n|$)/
 const inlineLatexRule = /^\\\(([^\\]*(?:\\.[^\\]*)*?)\\\)/
 const blockLatexRule = /^\\\[([^\\]*(?:\\.[^\\]*)*?)\\\]/
 
-function createRenderer(defaultDisplay: boolean, withStyle: boolean = true) {
-  return (token: any) => {
+function createRenderer(defaultDisplay: boolean, withStyle: boolean = true): KatexRenderFn {
+  return (token: KatexToken) => {
     const display = token.displayMode ?? defaultDisplay
 
-    // @ts-expect-error MathJax is a global variable
     window.MathJax.texReset()
-    // @ts-expect-error MathJax is a global variable
     const mjxContainer = window.MathJax.tex2svg(token.text, { display })
     const svg = mjxContainer.firstChild
     const width = svg.style[`min-width`] || svg.getAttribute(`width`)
     svg.removeAttribute(`width`)
 
     // 行内公式对齐 https://groups.google.com/g/mathjax-users/c/zThKffrrCvE?pli=1
-    // 直接覆盖 style 会覆盖 MathJax 的样式，需要手动设置
-    // svg.style = `max-width: 300vw !important; display: initial; flex-shrink: 0;`
+    // 直接覆盖 style 会覆盖 MathJax 的样式，需要逐个属性设置
 
     if (withStyle) {
       svg.style.display = `initial`
       svg.style.setProperty(`max-width`, `300vw`, `important`)
       svg.style.flexShrink = `0`
-      svg.style.width = width
+      svg.style.width = width || ``
     }
 
     if (!display) {
       // 新主题系统：使用 class 而非内联样式
-      return `<span class="katex-inline">${svg.outerHTML}</span>`
+      return `<span class="katex-inline" data-math-display="false" data-math-raw="${escapeHtml(token.raw ?? token.text)}">${svg.outerHTML}</span>`
     }
 
-    return `<section class="katex-block">${svg.outerHTML}</section>`
+    return `<section class="katex-block" data-math-display="true" data-math-raw="${escapeHtml(token.raw ?? token.text)}">${svg.outerHTML}</section>`
   }
 }
 
-function inlineKatex(options: MarkedKatexOptions | undefined, renderer: any) {
+function inlineKatex(options: MarkedKatexOptions | undefined, renderer: KatexRenderFn) {
   const nonStandard = options && options.nonStandard
   const ruleReg = nonStandard ? inlineRuleNonStandard : inlineRule
   return {
     name: `inlineKatex`,
-    level: `inline`,
+    level: `inline` as const,
     start(src: string) {
       let index
       let indexSrc = src
@@ -83,14 +84,14 @@ function inlineKatex(options: MarkedKatexOptions | undefined, renderer: any) {
         }
       }
     },
-    renderer,
+    renderer: asKatexRenderer(renderer),
   }
 }
 
-function blockKatex(_options: MarkedKatexOptions | undefined, renderer: any) {
+function blockKatex(_options: MarkedKatexOptions | undefined, renderer: KatexRenderFn) {
   return {
     name: `blockKatex`,
-    level: `block`,
+    level: `block` as const,
     tokenizer(src: string) {
       const match = src.match(blockRule)
       if (match) {
@@ -102,14 +103,14 @@ function blockKatex(_options: MarkedKatexOptions | undefined, renderer: any) {
         }
       }
     },
-    renderer,
+    renderer: asKatexRenderer(renderer),
   }
 }
 
-function inlineLatexKatex(_options: MarkedKatexOptions | undefined, renderer: any) {
+function inlineLatexKatex(_options: MarkedKatexOptions | undefined, renderer: KatexRenderFn) {
   return {
     name: `inlineLatexKatex`,
-    level: `inline`,
+    level: `inline` as const,
     start(src: string) {
       const index = src.indexOf(`\\(`)
       return index !== -1 ? index : undefined
@@ -125,14 +126,14 @@ function inlineLatexKatex(_options: MarkedKatexOptions | undefined, renderer: an
         }
       }
     },
-    renderer,
+    renderer: asKatexRenderer(renderer),
   }
 }
 
-function blockLatexKatex(_options: MarkedKatexOptions | undefined, renderer: any) {
+function blockLatexKatex(_options: MarkedKatexOptions | undefined, renderer: KatexRenderFn) {
   return {
     name: `blockLatexKatex`,
-    level: `block`,
+    level: `block` as const,
     start(src: string) {
       const index = src.indexOf(`\\[`)
       return index !== -1 ? index : undefined
@@ -148,7 +149,7 @@ function blockLatexKatex(_options: MarkedKatexOptions | undefined, renderer: any
         }
       }
     },
-    renderer,
+    renderer: asKatexRenderer(renderer),
   }
 }
 

@@ -1,11 +1,12 @@
-import type { MarkedExtension, Tokens } from 'marked'
+import type { MarkedExtension, Token } from 'marked'
+import type { PlantUMLToken } from '../types/marked-tokens'
 import { deflateSync } from 'fflate'
+import { asDiagramToken, asTextTokenRenderer, isCodeToken } from '../types/marked-tokens'
 import { simpleHash } from '../utils/basicHelpers'
+import { createSVGCache } from '../utils/svgCache'
 
-// key -> svg
-const svgCache = new Map<string, string>()
-// 上一次渲染的结果（用于在新渲染完成前显示旧图片）
-let lastRenderedSvg: string | null = null
+// key -> svg（LRU 缓存，上限 50 条）
+const svgCache = createSVGCache(50)
 
 export interface PlantUMLOptions {
   /**
@@ -154,7 +155,7 @@ function generatePlantUMLUrl(code: string, options: Required<PlantUMLOptions>): 
 /**
  * 渲染 PlantUML 图表
  */
-function renderPlantUMLDiagram(token: Tokens.Code, options: Required<PlantUMLOptions>, cacheKey: string): string {
+function renderPlantUMLDiagram(token: Pick<PlantUMLToken, 'text'>, options: Required<PlantUMLOptions>, cacheKey: string): string {
   const { text: code } = token
 
   // 检查代码是否包含 PlantUML 标记
@@ -175,7 +176,6 @@ function renderPlantUMLDiagram(token: Tokens.Code, options: Required<PlantUMLOpt
         const html = createPlantUMLHTML(imageUrl, options, svgContent)
         placeholderElement.outerHTML = html
         svgCache.set(cacheKey, html)
-        lastRenderedSvg = svgContent
       }
     })
 
@@ -184,11 +184,6 @@ function renderPlantUMLDiagram(token: Tokens.Code, options: Required<PlantUMLOpt
           .map(([key, value]) => `${key.replace(/([A-Z])/g, `-$1`).toLowerCase()}: ${value}`)
           .join(`; `)
       : ``
-
-    // 如果有上一次渲染的结果，显示旧图片；否则显示占位符
-    if (lastRenderedSvg) {
-      return `<div class="${options.className}" style="${containerStyles}" data-placeholder="${placeholder}">${lastRenderedSvg}</div>`
-    }
 
     return `<div class="${options.className}" style="${containerStyles}" data-placeholder="${placeholder}">
       <div style="color: #666; font-style: italic;">正在加载PlantUML图表...</div>
@@ -287,7 +282,7 @@ export function markedPlantUML(options: PlantUMLOptions = {}): MarkedExtension {
             }
           }
         },
-        renderer(token: any) {
+        renderer: asTextTokenRenderer((token: PlantUMLToken) => {
           const cacheKey = simpleHash(token.text)
 
           // 有缓存直接返回
@@ -297,13 +292,12 @@ export function markedPlantUML(options: PlantUMLOptions = {}): MarkedExtension {
           }
 
           return renderPlantUMLDiagram(token, resolvedOptions, cacheKey)
-        },
+        }),
       },
     ],
-    walkTokens(token: any) {
-      // 处理现有的代码块，如果语言是 plantuml 就转换类型
-      if (token.type === `code` && token.lang === `plantuml`) {
-        token.type = `plantuml`
+    walkTokens(token: Token) {
+      if (isCodeToken(token) && token.lang === `plantuml`) {
+        asDiagramToken<PlantUMLToken>(token, `plantuml`)
       }
     },
   }

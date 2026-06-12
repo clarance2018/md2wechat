@@ -1,13 +1,33 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import ConfirmDialog from '@/components/confirm-dialog/ConfirmDialog.vue'
+import CodemirrorEditor from '@/components/editor/CodemirrorEditor.vue'
 import { Toaster } from '@/components/ui/sonner'
+import { isAccountConfigured } from '@/services/account/config'
+import { isSyncUiEnabled } from '@/services/sync/client'
+import { useAuthStore } from '@/stores/auth'
+import { useSyncStore } from '@/stores/sync'
 import { useUIStore } from '@/stores/ui'
-import CodemirrorEditor from '@/views/CodemirrorEditor.vue'
 
 const uiStore = useUIStore()
 const { isDark } = storeToRefs(uiStore)
 
+const authStore = useAuthStore()
+const syncStore = useSyncStore()
+
 const isUtools = ref(false)
+
+/** 初始化账户与云同步 */
+async function bootstrapApp() {
+  if (isAccountConfigured())
+    await authStore.bootstrap()
+
+  if (!isSyncUiEnabled() || !authStore.isLoggedIn)
+    return
+
+  syncStore.startAutoSyncWatcher()
+  await syncStore.sync()
+}
 
 onMounted(() => {
   // 检测是否为 Utools 环境
@@ -15,6 +35,8 @@ onMounted(() => {
   if (isUtools.value) {
     document.documentElement.classList.add(`is-utools`)
   }
+
+  bootstrapApp()
 
   // 若 URL 带有 open 参数（Markdown 链接），打开导入对话框并自动导入
   const params = new URLSearchParams(window.location.search)
@@ -33,6 +55,8 @@ onMounted(() => {
 <template>
   <AppSplash />
   <CodemirrorEditor />
+
+  <ConfirmDialog />
 
   <Toaster
     rich-colors

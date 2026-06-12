@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { StateEffect } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
-import { ArrowUpDown, BookOpen, ChevronRight, ChevronsUpDown, Clock, Columns2, Eye, FileText, Keyboard, ListTree, Monitor, Moon, PenLine, Pilcrow, Search, Smartphone, Sun, Type } from 'lucide-vue-next'
+import { ArrowUpDown, BookOpen, ChevronRight, ChevronsUpDown, Clock, Cloud, CloudAlert, CloudCheck, Columns2, Eye, FileText, Keyboard, ListTree, Loader2, LogIn, Monitor, Moon, PenLine, Pilcrow, Search, Smartphone, Sun, Type, User } from '@lucide/vue'
 import {
   Popover,
   PopoverContent,
@@ -13,20 +13,53 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { isAccountUiEnabled } from '@/services/account/config'
+import { isSyncUiEnabled } from '@/services/sync/client'
+import { useAuthStore } from '@/stores/auth'
 import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
 import { useRenderStore } from '@/stores/render'
+import { useSyncStore } from '@/stores/sync'
 import { useUIStore } from '@/stores/ui'
 
 const renderStore = useRenderStore()
 const editorStore = useEditorStore()
 const postStore = usePostStore()
 const uiStore = useUIStore()
+const authStore = useAuthStore()
+const syncStore = useSyncStore()
 const { readingTime } = storeToRefs(renderStore)
 const { editor } = storeToRefs(editorStore)
 const { currentPost } = storeToRefs(postStore)
 const { isDark } = storeToRefs(uiStore)
 const { isMobile, viewMode, previewDevice, enableScrollSync } = storeToRefs(uiStore)
+const { isLoggedIn } = storeToRefs(authStore)
+const showAccountUi = isAccountUiEnabled()
+const showSyncUi = isSyncUiEnabled()
+const { isSyncing, syncState } = storeToRefs(syncStore)
+
+// 账户图标提示
+const accountTooltip = computed(() => {
+  if (!isLoggedIn.value)
+    return `登录账户`
+  return `账户 @${authStore.user?.login ?? ''}`
+})
+
+// 云同步图标提示
+const syncTooltip = computed(() => {
+  if (!isLoggedIn.value)
+    return `云同步（请先登录账户）`
+  switch (syncState.value) {
+    case `syncing`:
+      return `同步中…`
+    case `synced`:
+      return `已同步`
+    case `error`:
+      return `同步失败，点击重试`
+    default:
+      return `有未同步的更改`
+  }
+})
 
 // 相对时间格式化（复用）
 function formatRelativeTime(date: Date | string) {
@@ -70,7 +103,9 @@ function buildTree(posts: typeof postStore.posts): TreeNode[] {
   }
   const roots: TreeNode[] = []
   for (const p of posts) {
-    const node = map.get(p.id)!
+    const node = map.get(p.id)
+    if (!node)
+      continue
     if (p.parentId && map.has(p.parentId)) {
       map.get(p.parentId)!.children.push(node)
     }
@@ -147,7 +182,7 @@ function goToLine() {
   })
   view.focus()
   isGoToLineActive.value = false
-  updateCursorInfo(view)
+  updateCursorInfo(view as EditorView)
 }
 
 function cancelGoToLine() {
@@ -165,7 +200,7 @@ watch(editor, (view) => {
   attachedViews.add(view)
 
   // 初始化一次
-  updateCursorInfo(view)
+  updateCursorInfo(view as EditorView)
 
   const extension = EditorView.updateListener.of((update) => {
     // 只在光标或文档变化时更新
@@ -183,12 +218,12 @@ watch(editor, (view) => {
 watch(currentPost, () => {
   nextTick(() => {
     if (editor.value) {
-      updateCursorInfo(editor.value)
+      updateCursorInfo(editor.value as EditorView)
     }
   })
 })
 
-function updateCursorInfo(view: any) {
+function updateCursorInfo(view: EditorView) {
   const state = view.state
   const main = state.selection.main
   const line = state.doc.lineAt(main.head)
@@ -211,7 +246,7 @@ const allHeadings = ref<BreadcrumbItem[]>([])
 const isOutlineOpen = ref(false)
 const outlineScrollRef = ref<HTMLElement | null>(null)
 
-function updateHeadingsAndBreadcrumb(doc: any, currentLine: number) {
+function updateHeadingsAndBreadcrumb(doc: { lines: number, line: (n: number) => { text: string } }, currentLine: number) {
   const items: BreadcrumbItem[] = []
   const stack: BreadcrumbItem[] = []
   let codeFenceChar = ``
@@ -304,7 +339,7 @@ function jumpToHeading(line: number) {
     scrollIntoView: true,
   })
   view.focus()
-  updateCursorInfo(view)
+  updateCursorInfo(view as EditorView)
 }
 
 // 上次保存时间（复用 formatRelativeTime）
@@ -314,10 +349,24 @@ const savedTimeAgo = computed(() => {
   return formatRelativeTime(currentPost.value.updateDatetime)
 })
 
-// 每 10 秒刷新一次相对时间
+// 每 10 秒刷新一次相对时间（页面不可见时暂停）
 const refreshKey = ref(0)
-const refreshTimer = setInterval(() => refreshKey.value++, 10_000)
-onUnmounted(() => clearInterval(refreshTimer))
+const REFRESH_INTERVAL_MS = 10_000
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+
+function startRefreshTimer() {
+  refreshTimer = setInterval(() => {
+    if (!document.hidden) {
+      refreshKey.value++
+    }
+  }, REFRESH_INTERVAL_MS)
+}
+
+startRefreshTimer()
+onUnmounted(() => {
+  if (refreshTimer)
+    clearInterval(refreshTimer)
+})
 
 // 强制 computed 依赖 refreshKey
 const displaySavedTime = computed(() => {
@@ -505,9 +554,9 @@ const showDeviceToggle = computed(() => viewMode.value !== `edit` && !isMobile.v
       <div class="hidden min-w-0 flex-1 sm:block" />
 
       <!-- 右侧：统计信息 -->
-      <div class="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+      <div class="ml-auto flex shrink-0 items-center gap-2.5 sm:gap-3.5">
         <!-- 视图模式切换 -->
-        <div class="flex items-center rounded-md border border-border/60 p-0.5">
+        <div class="flex items-center gap-0.5 rounded-md border border-border/60 p-0.5">
           <Tooltip v-for="mode in viewModes" :key="mode.key">
             <TooltipTrigger as-child>
               <button
@@ -598,22 +647,70 @@ const showDeviceToggle = computed(() => viewMode.value !== `edit` && !isMobile.v
 
         <span class="hidden text-border sm:block">·</span>
 
-        <!-- 深浅色切换 -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button
-              class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
-              :class="isDark ? 'text-foreground' : ''"
-              @click="uiStore.toggleDark()"
-            >
-              <Moon v-if="isDark" class="size-3" />
-              <Sun v-else class="size-3" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
-            <p>{{ isDark ? '浅色模式' : '深色模式' }}</p>
-          </TooltipContent>
-        </Tooltip>
+        <!-- 账户 & 同步 & 主题 -->
+        <div class="flex items-center gap-1">
+          <template v-if="showAccountUi">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  aria-label="账户"
+                  class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                  :class="isLoggedIn ? 'text-primary' : ''"
+                  @click="uiStore.toggleShowAccountDialog(true)"
+                >
+                  <img
+                    v-if="isLoggedIn && authStore.user?.avatar"
+                    :src="authStore.user.avatar"
+                    :alt="authStore.user.login"
+                    class="size-3.5 rounded-full"
+                  >
+                  <User v-else-if="isLoggedIn" class="size-3" />
+                  <LogIn v-else class="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
+                <p>{{ accountTooltip }}</p>
+              </TooltipContent>
+            </Tooltip>
+          </template>
+
+          <template v-if="showSyncUi">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <button
+                  aria-label="云同步"
+                  class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                  :class="isLoggedIn ? 'text-primary' : ''"
+                  @click="uiStore.toggleShowSyncDialog(true)"
+                >
+                  <Loader2 v-if="isSyncing" class="size-3 animate-spin" />
+                  <CloudCheck v-else-if="isLoggedIn && syncState === 'synced'" class="size-3 text-green-500" />
+                  <CloudAlert v-else-if="isLoggedIn && syncState === 'error'" class="size-3 text-destructive" />
+                  <Cloud v-else class="size-3" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
+                <p>{{ syncTooltip }}</p>
+              </TooltipContent>
+            </Tooltip>
+          </template>
+
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <button
+                class="flex cursor-pointer items-center rounded p-0.5 transition-colors hover:bg-accent hover:text-foreground"
+                :class="isDark ? 'text-foreground' : ''"
+                @click="uiStore.toggleDark()"
+              >
+                <Moon v-if="isDark" class="size-3" />
+                <Sun v-else class="size-3" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" :side-offset="6" class="text-xs text-muted-foreground">
+              <p>{{ isDark ? '浅色模式' : '深色模式' }}</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
     </TooltipProvider>
   </footer>

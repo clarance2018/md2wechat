@@ -33,20 +33,19 @@ function setStyle(title: string, value: string) {
       <span>{{ props.title }}</span>
     </MenubarSubTrigger>
     <MenubarSubContent class="max-h-56 overflow-auto">
-      <MenubarCheckboxItem
-        v-for="{ label, value, desc } in options"
-        :key="value"
-        :label="label"
-        :model-value="value"
-        class="w-50"
-        :checked="current === value"
-        @click="change(value)"
-      >
-        {{ label }}
-        <DropdownMenuShortcut :style="setStyle(title, value)">
-          {{ desc }}
-        </DropdownMenuShortcut>
-      </MenubarCheckboxItem>
+      <MenubarRadioGroup :model-value="current" @update:model-value="change">
+        <MenubarRadioItem
+          v-for="{ label, value, desc } in options"
+          :key="value"
+          :value="value"
+          class="w-50"
+        >
+          {{ label }}
+          <DropdownMenuShortcut :style="setStyle(title, value)">
+            {{ desc }}
+          </DropdownMenuShortcut>
+        </MenubarRadioItem>
+      </MenubarRadioGroup>
     </MenubarSubContent>
   </MenubarSub>
 </template>

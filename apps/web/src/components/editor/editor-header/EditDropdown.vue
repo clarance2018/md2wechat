@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import type { EditorView } from '@codemirror/view'
-import { altSign, ctrlSign, shiftSign } from '@md/shared/configs'
-import { redoAction, undoAction } from '@md/shared/editor'
 import {
   ClipboardPaste,
   Copy,
@@ -10,11 +8,13 @@ import {
   Search,
   Undo2,
   WandSparkles,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
+import { altSign, ctrlSign, shiftSign } from '@md/shared/configs'
+import { redoAction, undoAction } from '@md/shared/editor'
 import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
 import { useUIStore } from '@/stores/ui'
-import { copyPlain, readPlain } from '@/utils/clipboard'
+import { copyPlain } from '@/utils/clipboard'
 
 const props = withDefaults(defineProps<{
   asSub?: boolean
@@ -48,11 +48,11 @@ async function copyToClipboard() {
 
 async function pasteFromClipboard() {
   try {
-    const text = await readPlain()
+    const text = await navigator.clipboard.readText()
     editorStore.replaceSelection(text)
   }
-  catch (error) {
-    toast.error((error as Error).message || `粘贴失败`)
+  catch {
+    // 静默失败
   }
 }
 

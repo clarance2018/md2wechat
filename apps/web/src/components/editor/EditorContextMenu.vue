@@ -1,6 +1,6 @@
 <script setup lang='ts'>
-import { altSign, headingLevels as baseHeadingLevels, ctrlKey, ctrlSign, shiftSign } from '@md/shared/configs'
 import {
+  Blocks,
   Bold,
   ClipboardPaste,
   Copy,
@@ -27,25 +27,35 @@ import {
   Table,
   Trash2,
   Wand2,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
+import { altSign, headingLevels as baseHeadingLevels, ctrlKey, ctrlSign, shiftSign } from '@md/shared/configs'
 import DEFAULT_CONTENT from '@/assets/example/markdown.md?raw'
 import { useEditorFormat } from '@/composables/useEditorFormat'
+import { useConfirmStore } from '@/stores/confirm'
+import { useCssEditorStore } from '@/stores/cssEditor'
 import { useEditorStore } from '@/stores/editor'
 import { useExportStore } from '@/stores/export'
 import { usePostStore } from '@/stores/post'
+import { useRenderStore } from '@/stores/render'
+import { useThemeStore } from '@/stores/theme'
 import { useUIStore } from '@/stores/ui'
 import { copyPlain, readPlain } from '@/utils/clipboard'
+import { normalizeFormulaInput } from '@/utils/formula'
 
+const confirmStore = useConfirmStore()
+const cssEditorStore = useCssEditorStore()
 const editorStore = useEditorStore()
-const postStore = usePostStore()
 const exportStore = useExportStore()
+const postStore = usePostStore()
+const renderStore = useRenderStore()
+const themeStore = useThemeStore()
 const uiStore = useUIStore()
 
 const {
   toggleShowInsertFormDialog,
-  toggleShowInsertMpCardDialog,
   toggleShowUploadImgDialog,
   toggleShowImportMdDialog,
+  toggleShowComponentDialog,
 } = uiStore
 
 const { editor } = storeToRefs(editorStore)
@@ -77,6 +87,14 @@ function clearContent() {
   editorStore.clearContent()
 }
 
+function openFormulaEditor() {
+  const selection = normalizeFormulaInput(editorStore.getSelection())
+  uiStore.openFormulaEditor({
+    value: selection.latex,
+    displayMode: selection.displayMode,
+  })
+}
+
 // 复制到剪贴板
 async function copyToClipboard() {
   const selectedText = editorStore.getSelection()
@@ -96,7 +114,19 @@ async function pasteFromClipboard() {
 
 // 重置样式确认
 function resetStyleConfirm() {
-  uiStore.isOpenConfirmDialog = true
+  confirmStore.confirm({
+    title: '提示',
+    description: '此操作将丢失本地自定义样式，是否继续？',
+    onConfirm: () => {
+      themeStore.resetStyle()
+      cssEditorStore.resetCssConfig()
+      themeStore.applyCurrentTheme()
+      themeStore.updateCodeTheme()
+      const raw = editorStore.getContent()
+      renderStore.render(raw)
+      toast.success(`样式已重置`)
+    },
+  })
 }
 
 // 导出函数
@@ -134,13 +164,17 @@ function downloadAsCardImage() {
             <Image class="mr-2 h-4 w-4" />
             图片
           </ContextMenuItem>
+          <ContextMenuItem @click="openFormulaEditor()">
+            <span class="mr-2 inline-flex h-4 w-4 items-center justify-center text-xs font-semibold">ƒ</span>
+            公式
+          </ContextMenuItem>
           <ContextMenuItem @click="toggleShowInsertFormDialog()">
             <Table class="mr-2 h-4 w-4" />
             表格
           </ContextMenuItem>
-          <ContextMenuItem @click="toggleShowInsertMpCardDialog()">
-            <FileText class="mr-2 h-4 w-4" />
-            公众号名片
+          <ContextMenuItem @click="toggleShowComponentDialog()">
+            <Blocks class="mr-2 h-4 w-4" />
+            组件
           </ContextMenuItem>
         </ContextMenuSubContent>
       </ContextMenuSub>

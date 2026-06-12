@@ -11,7 +11,6 @@ import {
   toBase64,
 } from '@md/shared/utils'
 
-import juice from 'juice'
 import { Marked } from 'marked'
 
 export {
@@ -80,8 +79,14 @@ export async function exportPostsAsZip(posts: Array<{ title: string, content: st
  * @returns {string} HTML 字符串
  */
 export function getHtmlContent(): string {
-  const element = document.querySelector(`#output`)!
-  return element.innerHTML
+  const element = document.querySelector(`#output`)
+  if (!element)
+    return ``
+  // Clone to avoid mutating the live DOM, then strip injected UI overlays
+  // (e.g. diagram download bars) that must not appear in exported content.
+  const clone = element.cloneNode(true) as HTMLElement
+  clone.querySelectorAll(`.diagram-download-bar`).forEach(el => el.remove())
+  return clone.innerHTML
 }
 
 /**
@@ -194,18 +199,31 @@ export async function exportPDF(title: string = `untitled`) {
   iframe.srcdoc = printHtml
   document.body.appendChild(iframe)
 
+  const removeIframe = () => {
+    if (iframe.parentNode) {
+      document.body.removeChild(iframe)
+    }
+  }
+
   iframe.onload = () => {
     iframe.contentWindow?.focus()
     iframe.contentWindow?.print()
     // 延迟移除，确保打印完成
-    setTimeout(() => {
-      document.body.removeChild(iframe)
-    }, 500)
+    setTimeout(removeIframe, 500)
   }
+
+  iframe.onerror = () => {
+    removeIframe()
+  }
+
+  // 兜底：如果 onload/onerror 都未触发，5 秒后强制清理
+  setTimeout(removeIframe, 5000)
 }
 
-export function solveWeChatImage() {
-  const clipboardDiv = document.getElementById(`output`)!
+export function solveWeChatImage(container?: HTMLElement) {
+  const clipboardDiv = container ?? document.getElementById(`output`)
+  if (!clipboardDiv)
+    return
   const images = clipboardDiv.getElementsByTagName(`img`)
 
   Array.from(images).forEach((image) => {
@@ -266,7 +284,8 @@ function getThemeStyles(): string {
   return styleContent
 }
 
-function mergeCss(html: string): string {
+async function mergeCss(html: string): Promise<string> {
+  const { default: juice } = await import(`juice`)
   return juice(html, {
     inlinePseudoElements: true,
     preserveImportant: true,
@@ -282,7 +301,7 @@ function modifyHtmlStructure(htmlString: string): string {
 
   // 移动 `li > ul` 和 `li > ol` 到 `li` 后面
   tempDiv.querySelectorAll(`li > ul, li > ol`).forEach((originalItem) => {
-    originalItem.parentElement!.insertAdjacentElement(`afterend`, originalItem)
+    originalItem.parentElement?.insertAdjacentElement(`afterend`, originalItem)
   })
 
   return tempDiv.innerHTML
@@ -308,7 +327,15 @@ async function getStylesToAdd(): Promise<string> {
 }
 
 export async function processClipboardContent(primaryColor: string) {
-  const clipboardDiv = document.getElementById(`output`)!
+  const outputElement = document.getElementById(`output`)
+  if (!outputElement) {
+    return {
+      html: ``,
+      plainText: ``,
+    }
+  }
+
+  const clipboardDiv = outputElement.cloneNode(true) as HTMLElement
 
   const stylesToAdd = await getStylesToAdd()
 
@@ -317,7 +344,10 @@ export async function processClipboardContent(primaryColor: string) {
   }
 
   // 先合并 CSS 和修改 HTML 结构
-  clipboardDiv.innerHTML = modifyHtmlStructure(mergeCss(clipboardDiv.innerHTML))
+  clipboardDiv.innerHTML = modifyHtmlStructure(await mergeCss(clipboardDiv.innerHTML))
+
+  // 移除 fragment 锚点的 href（微信公众号后台不支持页面内跳转，保留会导致保存报错）
+  clipboardDiv.querySelectorAll(`a[href^="#"]`).forEach(a => a.removeAttribute(`href`))
 
   // 处理样式和颜色变量
   clipboardDiv.innerHTML = clipboardDiv.innerHTML
@@ -338,7 +368,7 @@ export async function processClipboardContent(primaryColor: string) {
     )
 
   // 处理图片大小
-  solveWeChatImage()
+  solveWeChatImage(clipboardDiv)
 
   // 添加空白节点用于兼容 SVG 复制
   const beforeNode = createEmptyNode()
@@ -349,15 +379,21 @@ export async function processClipboardContent(primaryColor: string) {
   // 兼容 Mermaid
   const nodes = clipboardDiv.querySelectorAll(`.nodeLabel`)
   nodes.forEach((node) => {
-    const parent = node.parentElement!
-    const xmlns = parent.getAttribute(`xmlns`)!
-    const style = parent.getAttribute(`style`)!
+    const parent = node.parentElement
+    if (!parent)
+      return
+    const xmlns = parent.getAttribute(`xmlns`)
+    const style = parent.getAttribute(`style`)
+    if (!xmlns || !style)
+      return
     const section = document.createElement(`section`)
     section.setAttribute(`xmlns`, xmlns)
     section.setAttribute(`style`, style)
     section.innerHTML = parent.innerHTML
 
-    const grand = parent.parentElement!
+    const grand = parent.parentElement
+    if (!grand)
+      return
     // 清空父元素
     grand.innerHTML = ``
     grand.appendChild(section)
@@ -393,4 +429,9 @@ export async function processClipboardContent(primaryColor: string) {
       }
     })
   })
+
+  return {
+    html: clipboardDiv.innerHTML,
+    plainText: clipboardDiv.textContent || ``,
+  }
 }

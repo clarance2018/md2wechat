@@ -7,7 +7,7 @@ import {
   Clock,
   FileText,
   Trash2,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { useFolderConfigStore } from '@/stores/folderConfig'
 import { usePostStore } from '@/stores/post'
 

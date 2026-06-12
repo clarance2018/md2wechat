@@ -21,6 +21,24 @@ interface RuntimeFolderInfo {
 }
 
 /**
+ * Safely extract a message from an unknown error value.
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error)
+    return error.message
+  return String(error)
+}
+
+/**
+ * Safely extract the error name from an unknown error value.
+ */
+function getErrorName(error: unknown): string {
+  if (error instanceof Error)
+    return error.name
+  return `UnknownError`
+}
+
+/**
  * 本地文件夹源 Store
  * 负责管理本地文件夹的访问、文件树结构和文件读写
  */
@@ -130,13 +148,14 @@ export const useFolderSourceStore = defineStore(`folderSource`, () => {
 
       toast.success(`文件夹「${handle.name}」已打开`)
     }
-    catch (error: any) {
-      if (error.name === `AbortError`) {
+    catch (error: unknown) {
+      if (getErrorName(error) === `AbortError`) {
         // 用户取消了选择
         return
       }
-      loadError.value = error.message || `打开文件夹失败`
-      toast.error(`打开文件夹失败: ${error.message}`)
+      const msg = getErrorMessage(error)
+      loadError.value = msg
+      toast.error(`打开文件夹失败: ${msg}`)
     }
     finally {
       isLoading.value = false
@@ -144,9 +163,13 @@ export const useFolderSourceStore = defineStore(`folderSource`, () => {
   }
 
   /**
-   * 关闭当前文件夹
+   * 关闭当前文件夹，同时释放内存中的句柄引用
    */
   function closeFolder() {
+    // 释放当前文件夹的句柄引用，避免内存泄漏
+    if (currentFolderId.value) {
+      runtimeFolderMap.delete(currentFolderId.value)
+    }
     currentFolderId.value = null
     fileTree.value = []
     selectedFilePath.value = ``
@@ -172,8 +195,8 @@ export const useFolderSourceStore = defineStore(`folderSource`, () => {
       const tree = await buildFileTree(handle, handle.name)
       fileTree.value = [tree]
     }
-    catch (error: any) {
-      loadError.value = error.message || `加载文件树失败`
+    catch (error: unknown) {
+      loadError.value = getErrorMessage(error)
       throw error
     }
   }
@@ -222,8 +245,8 @@ export const useFolderSourceStore = defineStore(`folderSource`, () => {
         return a.name.localeCompare(b.name, `zh-CN`)
       })
     }
-    catch (error: any) {
-      console.error(`读取目录失败: ${path}`, error)
+    catch (error: unknown) {
+      console.error(`读取目录失败: ${path}`, getErrorMessage(error))
     }
 
     return node
@@ -253,8 +276,8 @@ export const useFolderSourceStore = defineStore(`folderSource`, () => {
       const file = await fileHandle.getFile()
       return await file.text()
     }
-    catch (error: any) {
-      toast.error(`读取文件失败: ${error.message}`)
+    catch (error: unknown) {
+      toast.error(`读取文件失败: ${getErrorMessage(error)}`)
       throw error
     }
   }
@@ -293,8 +316,8 @@ export const useFolderSourceStore = defineStore(`folderSource`, () => {
       await writable.write(content)
       await writable.close()
     }
-    catch (error: any) {
-      console.error(`保存文件失败: ${error.message}`)
+    catch (error: unknown) {
+      console.error(`保存文件失败: ${getErrorMessage(error)}`)
       throw error
     }
   }

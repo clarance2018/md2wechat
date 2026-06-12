@@ -1,5 +1,5 @@
+import { v4 as uuidv4 } from 'uuid'
 import { ref, watch } from 'vue'
-import { createId } from '@/utils/id'
 import { store } from '@/utils/storage'
 
 export interface QuickCommandPersisted {
@@ -31,7 +31,7 @@ const DEFAULT_COMMANDS: QuickCommandPersisted[] = [
   { id: `summary`, label: `总结`, template: `请对以下内容进行总结：\n\n{{sel}}` },
 ]
 
-export const useQuickCommands = defineStore(`quickCommands`, () => {
+export const useQuickCommandsStore = defineStore(`quickCommands`, () => {
   // ---------- state ----------
   const commands = ref<QuickCommandRuntime[]>([])
 
@@ -64,7 +64,7 @@ export const useQuickCommands = defineStore(`quickCommands`, () => {
 
   // ---------- CRUD ----------
   function add(label: string, template: string) {
-    const id = createId()
+    const id = uuidv4()
     commands.value.push(hydrate({ id, label, template }))
   }
 

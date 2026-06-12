@@ -1,5 +1,8 @@
-import type { MarkedExtension } from 'marked'
+import type { MarkedExtension, Token } from 'marked'
+import type { MermaidToken } from '../types/marked-tokens'
+import { asDiagramToken, asTextTokenRenderer, isCodeToken } from '../types/marked-tokens'
 import { simpleHash } from '../utils/basicHelpers'
+import { createSVGCache } from '../utils/svgCache'
 
 let initPromise: Promise<typeof import('mermaid')['default']> | null = null
 
@@ -17,10 +20,8 @@ function getMermaid() {
   return initPromise
 }
 
-// key -> svg
-const svgCache = new Map<string, string>()
-// 上一次渲染的结果（用于在新渲染完成前显示旧图片）
-let lastRenderedSvg: string | null = null
+// key -> svg（LRU 缓存，上限 50 条）
+const svgCache = createSVGCache(50)
 
 function renderMermaid(id: string, code: string, cacheKey: string) {
   if (typeof window === 'undefined')
@@ -28,7 +29,6 @@ function renderMermaid(id: string, code: string, cacheKey: string) {
 
   const handleResult = (svg: string) => {
     svgCache.set(cacheKey, svg)
-    lastRenderedSvg = svg
 
     const el = document.getElementById(id)
     if (el) {
@@ -71,7 +71,7 @@ export function markedMermaid(): MarkedExtension {
             }
           }
         },
-        renderer(token: any) {
+        renderer: asTextTokenRenderer((token: MermaidToken) => {
           const code = token.text
           const cacheKey = simpleHash(code)
 
@@ -85,18 +85,13 @@ export function markedMermaid(): MarkedExtension {
           const id = `mermaid-${cacheKey}`
           renderMermaid(id, code, cacheKey)
 
-          // 如果有上一次渲染的结果，显示旧图片；否则显示占位符
-          if (lastRenderedSvg) {
-            return `<!--mermaid-start--><div id="${id}" class="${className}">${lastRenderedSvg}</div><!--mermaid-end-->`
-          }
-
           return `<!--mermaid-start--><div id="${id}" class="${className}">正在加载 Mermaid...</div><!--mermaid-end-->`
-        },
+        }),
       },
     ],
-    walkTokens(token: any) {
-      if (token.type === 'code' && token.lang === 'mermaid') {
-        token.type = 'mermaid'
+    walkTokens(token: Token) {
+      if (isCodeToken(token) && token.lang === 'mermaid') {
+        asDiagramToken<MermaidToken>(token, 'mermaid')
       }
     },
   }

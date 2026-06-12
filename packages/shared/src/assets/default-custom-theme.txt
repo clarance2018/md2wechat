@@ -13,7 +13,7 @@
 }
 
 /* 根容器 */
-.md-container {
+.container {
 }
 
 /* 标题样式 */
@@ -54,7 +54,7 @@ blockquote > p {
 
 /* 代码 */
 /* 行内代码 */
-code {
+.codespan {
 }
 
 /* 代码块容器 */

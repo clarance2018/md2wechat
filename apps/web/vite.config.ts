@@ -28,13 +28,18 @@ export default defineConfig(({ mode }) => {
 
   return {
     base,
-    define: { process },
     envPrefix: [`VITE_`, `CF_`],
     plugins: [
-      vue(),
+      vue({
+        template: {
+          compilerOptions: {
+            isCustomElement: tag => tag === `math-field`,
+          },
+        },
+      }),
       isCfWorkers && cloudflare(),
       tailwindcss(),
-      vueDevTools({
+      mode === `development` && vueDevTools({
         launchEditor: env.VITE_LAUNCH_EDITOR ?? `code`,
       }),
       VitePluginRadar({
@@ -58,6 +63,12 @@ export default defineConfig(({ mode }) => {
     css: { devSourcemap: true },
     build: {
       rollupOptions: {
+        onwarn(warning, warn) {
+          // @vueuse/core 中的 /* #__PURE__ */ 注释位置不符合 Rolldown 要求，忽略该警告
+          if (warning.code === `INVALID_ANNOTATION` && warning.message?.includes(`@vueuse/core`))
+            return
+          warn(warning)
+        },
         output: {
           chunkFileNames: `static/js/md-[name]-[hash].js`,
           entryFileNames: `static/js/md-[name]-[hash].js`,
@@ -112,7 +123,7 @@ export default defineConfig(({ mode }) => {
           },
         },
       },
-      chunkSizeWarningLimit: 1700,
+      chunkSizeWarningLimit: 2000,
     },
   }
 })

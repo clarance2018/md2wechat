@@ -11,7 +11,7 @@ import {
   Package,
   PlusSquare,
   Trash2,
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { usePostStore } from '@/stores/post'
 import { useTemplateStore } from '@/stores/template'
 import { useUIStore } from '@/stores/ui'
@@ -25,10 +25,10 @@ const uiStore = useUIStore()
 const { posts, currentPostId } = storeToRefs(postStore)
 const { toggleShowTemplateDialog } = uiStore
 
-const { drag, select, actions } = props
-const isSelectMode = select?.isSelectMode ?? false
-const selectedIds = select?.selectedIds ?? []
-const onToggleSelect = select?.onToggleSelect
+const { drag, actions } = props
+const isSelectMode = computed(() => props.select?.isSelectMode ?? false)
+const selectedIds = computed(() => props.select?.selectedIds ?? [])
+const onToggleSelect = computed(() => props.select?.onToggleSelect)
 
 function handleDragStart(id: string, e: DragEvent) {
   drag.setDragSourceId(id)
