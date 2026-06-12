@@ -12,6 +12,7 @@ import {
   PlusSquare,
   Trash2,
 } from '@lucide/vue'
+import { useFolderConfigStore } from '@/stores/folderConfig'
 import { usePostStore } from '@/stores/post'
 import { useTemplateStore } from '@/stores/template'
 import { useUIStore } from '@/stores/ui'
@@ -20,6 +21,7 @@ import { downloadMD } from '@/utils'
 const props = defineProps<PostItemProps>()
 
 const postStore = usePostStore()
+const folderConfigStore = useFolderConfigStore()
 const templateStore = useTemplateStore()
 const uiStore = useUIStore()
 const { posts, currentPostId } = storeToRefs(postStore)
@@ -109,6 +111,12 @@ function commitInlineRename() {
 function cancelInlineRename() {
   inlineEditId.value = null
 }
+
+function getPostFolderStyle(post: Post) {
+  if (!post.sourceFolderId)
+    return null
+  return folderConfigStore.getFolderStyle(post.sourceFolderId)
+}
 </script>
 
 <template>
@@ -166,21 +174,36 @@ function cancelInlineRename() {
         />
       </button>
 
-      <input
-        v-if="inlineEditId === post.id"
-        :ref="setInlineInputRef"
-        v-model="inlineEditVal"
-        class="flex-1 min-w-0 bg-transparent outline-none border-b border-primary text-[13px] leading-snug"
-        @click.stop
-        @keyup.enter="commitInlineRename"
-        @keyup.escape="cancelInlineRename"
-        @blur="commitInlineRename"
-      >
-      <span
-        v-else
-        class="flex-1 truncate select-none"
-        @dblclick.stop="startInlineRename(post)"
-      >{{ post.title }}</span>
+      <template v-if="inlineEditId === post.id">
+        <input
+          :ref="setInlineInputRef"
+          v-model="inlineEditVal"
+          class="flex-1 min-w-0 bg-transparent outline-none border-b border-primary text-[13px] leading-snug"
+          @click.stop
+          @keyup.enter="commitInlineRename"
+          @keyup.escape="cancelInlineRename"
+          @blur="commitInlineRename"
+        >
+      </template>
+      <template v-else>
+        <span
+          v-if="getPostFolderStyle(post)"
+          class="size-2 shrink-0 rounded-full"
+          :style="{ backgroundColor: getPostFolderStyle(post)?.color }"
+          :title="getPostFolderStyle(post)?.label || '来源文件夹'"
+        />
+        <span
+          class="flex-1 truncate select-none"
+          @dblclick.stop="startInlineRename(post)"
+        >{{ post.title }}</span>
+        <span
+          v-if="getPostFolderStyle(post)?.label"
+          class="max-w-16 shrink-0 truncate rounded bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground"
+          :title="getPostFolderStyle(post)?.label"
+        >
+          {{ getPostFolderStyle(post)?.label }}
+        </span>
+      </template>
 
       <DropdownMenu v-if="!isSelectMode">
         <DropdownMenuTrigger as-child>

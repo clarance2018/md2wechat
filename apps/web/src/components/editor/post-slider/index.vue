@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { CheckSquare, ChevronsDownUp, ChevronsUpDown, Download, Ellipsis, FileText, Plus, Regex, Replace, ReplaceAll, Search, Upload, X } from '@lucide/vue'
+import { CheckSquare, ChevronsDownUp, ChevronsUpDown, Clock, Download, Ellipsis, FileText, Plus, Regex, Replace, ReplaceAll, Search, Upload, X } from '@lucide/vue'
+import ContentArchive from '@/components/editor/ContentArchive.vue'
 import { useConfirmStore } from '@/stores/confirm'
 import { useEditorStore } from '@/stores/editor'
 import { usePostStore } from '@/stores/post'
@@ -173,9 +174,18 @@ const replaceQuery = ref(``)
 const showReplace = ref(true)
 const isRegex = ref(false)
 const isCaseSensitive = ref(false)
+const isArchiveView = ref(false)
+
+function toggleArchiveView() {
+  isArchiveView.value = !isArchiveView.value
+  if (isArchiveView.value)
+    closeSearch()
+}
 
 function toggleSearch() {
   isSearching.value = !isSearching.value
+  if (isSearching.value)
+    isArchiveView.value = false
   if (isSearching.value) {
     nextTick(() => searchInputRef.value?.focus())
   }
@@ -628,6 +638,16 @@ function handleDragEnd() {
         </span>
         <span class="flex-1" />
 
+        <!-- 时间归档 -->
+        <button
+          class="inline-flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-150"
+          :class="{ 'text-primary bg-primary/10': isArchiveView }"
+          title="时间归档"
+          @click="toggleArchiveView"
+        >
+          <Clock class="size-4" />
+        </button>
+
         <!-- 搜索 -->
         <button
           class="inline-flex items-center justify-center size-7 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors duration-150"
@@ -836,6 +856,11 @@ function handleDragEnd() {
             没有匹配的内容
           </p>
         </div>
+      </div>
+
+      <!-- 时间归档 -->
+      <div v-else-if="isArchiveView" class="flex-1 overflow-hidden">
+        <ContentArchive />
       </div>
 
       <!-- 内容列表 -->
